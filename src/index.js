@@ -633,14 +633,14 @@ function changeButtons() {
   }
 }
 
-function filterNotes() {
+function countNotes() {
   return ns.notes
     .filter((note) => instrumentStates.get(note.instrument))
-    .filter((note) => programStates.get(note.program));
+    .filter((note) => programStates.get(note.program)).length;
 }
 
 function scoring() {
-  const totalCount = filterNotes().length;
+  const totalCount = countNotes();
   const accuracy = (perfectCount + greatCount) / tapCount;
   const missCount = totalCount - perfectCount - greatCount;
   const perfectRate = Math.ceil(perfectCount / totalCount * 10000) / 100;
