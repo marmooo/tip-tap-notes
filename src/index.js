@@ -523,7 +523,12 @@ function typeEvent(event) {
   switch (event.code) {
     case "Space":
       event.preventDefault();
-      // falls through
+      if (player.getPlayState() == "started") {
+        pause();
+      } else {
+        play();
+      }
+      break;
     default:
       return typeEventKey(event.key);
   }
