@@ -510,16 +510,16 @@ function getMinMaxPitch() {
 function changeVisualizerPositions(visualizer) {
   const [minPitch, maxPitch] = getMinMaxPitch();
   const pitchRange = maxPitch - minPitch + 1;
-  const level = document.getElementById("levelOption").selectedIndex;
-  const levelStep = pitchRange / level;
+  const course = document.getElementById("courseOption").selectedIndex;
+  const courseStep = pitchRange / course;
   const viewBox = visualizer.svg.getAttribute("viewBox").split(" ");
   const svgWidth = parseFloat(viewBox[2]);
-  const widthStep = svgWidth / level;
+  const widthStep = svgWidth / course;
   [...visualizer.svg.childNodes]
     .filter((rect) => !rect.classList.contains("d-none"))
     .forEach((rect) => {
       const pitch = parseInt(rect.dataset.pitch);
-      const n = Math.floor((pitch - minPitch) / levelStep);
+      const n = Math.floor((pitch - minPitch) / courseStep);
       rect.setAttribute("x", Math.ceil(n * widthStep));
       rect.setAttribute("width", widthStep);
     });
@@ -603,14 +603,14 @@ function setButtonEvent(button, state, width, svgHeight) {
 function changeButtons() {
   tapCount = perfectCount = greatCount = 0;
   const texts = Array.from("AWSEDRFTGYHUJIKOLP;@");
-  const level = document.getElementById("levelOption").selectedIndex;
+  const course = document.getElementById("courseOption").selectedIndex;
   const playPanel = document.getElementById("playPanel");
   playPanel.replaceChildren();
   const viewBox = visualizer.svg.getAttribute("viewBox").split(" ");
   const svgWidth = parseFloat(viewBox[2]);
   const svgHeight = parseFloat(viewBox[3]);
-  const widthStep = svgWidth / level;
-  for (let i = 0; i < level; i++) {
+  const widthStep = svgWidth / course;
+  for (let i = 0; i < course; i++) {
     const width = Math.ceil(i * widthStep);
     const div = document.createElement("div");
     div.className = "w-100";
@@ -620,7 +620,7 @@ function changeButtons() {
     const button = document.createElement("button");
     button.className = "w-100 btn btn-lg btn-outline-secondary";
     button.role = "button";
-    button.textContent = (level > 9) ? texts[i] : texts[i * 2];
+    button.textContent = (course > 9) ? texts[i] : texts[i * 2];
     setButtonEvent(button, state, width, svgHeight);
     div.appendChild(button);
     div.appendChild(state);
@@ -648,13 +648,13 @@ function scoring() {
   const missRate = Math.ceil(missCount / totalCount * 10000) / 100;
   const tapped = perfectCount * 2 + greatCount;
   const speed = parseInt(document.getElementById("speed").value);
-  const level = document.getElementById("levelOption").selectedIndex;
+  const course = document.getElementById("courseOption").selectedIndex;
   const programs = Array.from(programStates.values())
     .filter((state) => state).length;
   const instruments = Array.from(instrumentStates.values())
     .filter((state) => state).length;
   const score = parseInt(
-    tapped * speed * programs * instruments * level * accuracy,
+    tapped * speed * programs * instruments * course * accuracy,
   );
   document.getElementById("perfectCount").textContent = perfectCount;
   document.getElementById("greatCount").textContent = greatCount;
@@ -709,5 +709,5 @@ document.getElementById("repeat").onclick = repeat;
 document.getElementById("volumeOnOff").onclick = volumeOnOff;
 document.getElementById("volumebar").onchange = changeVolumebar;
 document.getElementById("seekbar").onchange = changeSeekbar;
-document.getElementById("levelOption").onchange = changeButtons;
+document.getElementById("courseOption").onchange = changeButtons;
 window.addEventListener("resize", resizeScroll);
