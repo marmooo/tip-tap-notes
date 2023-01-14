@@ -486,17 +486,17 @@ function resizeScroll() {
 function getMinMaxPitch() {
   let min = Infinity;
   let max = -Infinity;
-  // ns.notes.forEach((note) => {
-  //   if (note.pitch < min) min = note.pitch;
-  //   if (max < note.pitch) max = note.pitch;
+  // const rects = [...visualizer.svg.childNodes];
+  // rects.forEach((rect) => {
+  //   if (!rect.classList.contains("d-none")) {
+  //     const pitch = parseInt(rect.dataset.pitch);
+  //     if (pitch < min) min = pitch;
+  //     if (max < pitch) max = pitch;
+  //   }
   // });
-  const rects = [...visualizer.svg.childNodes];
-  rects.forEach((rect) => {
-    if (!rect.classList.contains("d-none")) {
-      const pitch = parseInt(rect.dataset.pitch);
-      if (pitch < min) min = pitch;
-      if (max < pitch) max = pitch;
-    }
+  ns.notes.forEach((note) => {
+    if (note.pitch < min) min = note.pitch;
+    if (max < note.pitch) max = note.pitch;
   });
   return [min, max];
 }
