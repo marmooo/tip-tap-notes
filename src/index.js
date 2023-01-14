@@ -182,6 +182,12 @@ async function initPlayer() {
       }
       scoring();
       scoreModal.show();
+      [...visualizer.svg.childNodes]
+        .forEach((rect) => {
+          if (rect.classList.contains("scored")) {
+            rect.classList.remove("scored");
+          }
+        });
     },
   };
   stop();
