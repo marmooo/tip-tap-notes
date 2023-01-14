@@ -14,10 +14,6 @@ function toggleDarkMode() {
   }
 }
 
-function unlockAudio() {
-  audioContext.resume();
-}
-
 function dropFileEvent(event) {
   event.preventDefault();
   const file = event.dataTransfer.files[0];
@@ -168,7 +164,6 @@ function initVisualizer() {
 }
 
 async function initPlayer() {
-  unlockAudio();
   const soundFont =
     "https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus";
   const playerCallback = {
@@ -665,8 +660,6 @@ function scoring() {
   document.getElementById("twitter").href = twitterUrl;
 }
 
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioContext = new AudioContext();
 let ns;
 let nsCache;
 let seekbarInterval;
