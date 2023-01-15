@@ -639,9 +639,14 @@ function countNotes() {
     .filter((note) => programStates.get(note.program)).length;
 }
 
+function getAccuracy() {
+  if (tapCount == 0) return 0;
+  return (perfectCount + greatCount) / tapCount;
+}
+
 function scoring() {
   const totalCount = countNotes();
-  const accuracy = (perfectCount + greatCount) / tapCount;
+  const accuracy = getAccuracy();
   const missCount = totalCount - perfectCount - greatCount;
   const perfectRate = Math.ceil(perfectCount / totalCount * 10000) / 100;
   const greatRate = Math.ceil(greatCount / totalCount * 10000) / 100;
