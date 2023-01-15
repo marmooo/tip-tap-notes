@@ -182,7 +182,7 @@ async function initPlayer() {
       }
       scoring();
       scoreModal.show();
-      [...visualizer.svg.childNodes]
+      [...visualizer.svg.children]
         .forEach((rect) => {
           if (rect.classList.contains("scored")) {
             rect.classList.remove("scored");
@@ -286,7 +286,7 @@ function setInstrumentsCheckbox() {
   });
   const doc = new DOMParser().parseFromString(str, "text/html");
   const node = document.getElementById("filterInstruments");
-  node.replaceChildren(...doc.body.childNodes);
+  node.replaceChildren(...doc.body.children);
   [...node.querySelectorAll("input")].forEach((input) => {
     input.addEventListener("change", () => {
       const instrumentId = input.value;
@@ -318,7 +318,7 @@ function setProgramsCheckbox() {
   });
   const doc = new DOMParser().parseFromString(str, "text/html");
   const node = document.getElementById("filterPrograms");
-  node.replaceChildren(...doc.body.childNodes);
+  node.replaceChildren(...doc.body.children);
   [...node.querySelectorAll("input")].forEach((input) => {
     input.addEventListener("change", () => {
       const programId = input.value;
@@ -492,7 +492,7 @@ function resizeScroll() {
 function getMinMaxPitch() {
   let min = Infinity;
   let max = -Infinity;
-  // const rects = [...visualizer.svg.childNodes];
+  // const rects = [...visualizer.svg.children];
   // rects.forEach((rect) => {
   //   if (!rect.classList.contains("d-none")) {
   //     const pitch = parseInt(rect.dataset.pitch);
@@ -515,7 +515,7 @@ function changeVisualizerPositions(visualizer) {
   const viewBox = visualizer.svg.getAttribute("viewBox").split(" ");
   const svgWidth = parseFloat(viewBox[2]);
   const widthStep = svgWidth / course;
-  [...visualizer.svg.childNodes]
+  [...visualizer.svg.children]
     .filter((rect) => !rect.classList.contains("d-none"))
     .forEach((rect) => {
       const pitch = parseInt(rect.dataset.pitch);
@@ -559,7 +559,7 @@ function setButtonEvent(button, state, width, svgHeight) {
     const waterfallHeight = visualizer.svg.getBoundingClientRect().height;
     const scrollRatio = visualizer.parentElement.scrollTop / waterfallHeight;
     let stateText = "MISS";
-    [...visualizer.svg.childNodes]
+    [...visualizer.svg.children]
       .filter((rect) => width == parseInt(rect.getAttribute("x")))
       .filter((rect) => !rect.classList.contains("d-none"))
       .filter((rect) => !rect.classList.contains("scored"))
