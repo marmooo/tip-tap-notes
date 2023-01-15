@@ -184,8 +184,8 @@ async function initPlayer() {
       scoreModal.show();
       [...visualizer.svg.children]
         .forEach((rect) => {
-          if (rect.classList.contains("scored")) {
-            rect.classList.remove("scored");
+          if (rect.classList.contains("fade")) {
+            rect.classList.remove("fade");
           }
         });
     },
@@ -562,7 +562,7 @@ function setButtonEvent(button, state, width, svgHeight) {
     [...visualizer.svg.children]
       .filter((rect) => width == parseInt(rect.getAttribute("x")))
       .filter((rect) => !rect.classList.contains("d-none"))
-      .filter((rect) => !rect.classList.contains("scored"))
+      .filter((rect) => !rect.classList.contains("fade"))
       .forEach((rect) => {
         const y = parseFloat(rect.getAttribute("y"));
         const height = parseFloat(rect.getAttribute("height"));
@@ -572,11 +572,11 @@ function setButtonEvent(button, state, width, svgHeight) {
         const avgRatio = (minRatio + maxRatio) / 2;
         if (avgRatio <= scrollRatio && scrollRatio <= maxRatio) {
           stateText = "PERFECT";
-          rect.classList.add("scored");
+          rect.classList.add("fade");
           perfectCount += 1;
         } else if (minRatio <= scrollRatio && scrollRatio < avgRatio) {
           stateText = "GREAT";
-          rect.classList.add("scored");
+          rect.classList.add("fade");
           greatCount += 1;
         }
       });
