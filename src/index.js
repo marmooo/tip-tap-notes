@@ -185,6 +185,7 @@ async function initPlayer() {
       scoreModal.show();
       [...visualizer.svg.children]
         .forEach((rect) => {
+          rect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
           if (rect.classList.contains("fade")) {
             rect.classList.remove("fade");
           }
