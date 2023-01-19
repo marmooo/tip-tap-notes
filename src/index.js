@@ -556,51 +556,61 @@ function typeEventKey(key) {
   }
 }
 
+function buttonEvent(state, width, svgHeight) {
+  tapCount += 1;
+  const waterfallHeight = visualizer.svg.getBoundingClientRect().height;
+  const scrollRatio = visualizer.parentElement.scrollTop / waterfallHeight;
+  let stateText = "MISS";
+  [...visualizer.svg.children]
+    .filter((rect) => width == parseInt(rect.getAttribute("x")))
+    .filter((rect) => !rect.classList.contains("d-none"))
+    .filter((rect) => !rect.classList.contains("fade"))
+    .forEach((rect) => {
+      const y = parseFloat(rect.getAttribute("y"));
+      const height = parseFloat(rect.getAttribute("height"));
+      const loosePixel = 2;
+      const minRatio = (y - loosePixel) / svgHeight;
+      const maxRatio = (y + height + loosePixel) / svgHeight;
+      const avgRatio = (minRatio + maxRatio) / 2;
+      if (avgRatio <= scrollRatio && scrollRatio <= maxRatio) {
+        stateText = "PERFECT";
+        rect.classList.add("fade");
+        perfectCount += 1;
+      } else if (minRatio <= scrollRatio && scrollRatio < avgRatio) {
+        stateText = "GREAT";
+        rect.classList.add("fade");
+        greatCount += 1;
+      }
+    });
+  switch (stateText) {
+    case "PERFECT":
+      state.textContent = stateText;
+      state.className = "badge bg-primary";
+      break;
+    case "GREAT":
+      state.textContent = stateText;
+      state.className = "badge bg-success";
+      break;
+    case "MISS":
+      state.className = "badge bg-danger";
+      break;
+  }
+  setTimeout(() => {
+    state.textContent = "MISS";
+    state.className = "badge";
+  }, 200);
+}
+
 function setButtonEvent(button, state, width, svgHeight) {
-  button.onclick = () => {
-    tapCount += 1;
-    const waterfallHeight = visualizer.svg.getBoundingClientRect().height;
-    const scrollRatio = visualizer.parentElement.scrollTop / waterfallHeight;
-    let stateText = "MISS";
-    [...visualizer.svg.children]
-      .filter((rect) => width == parseInt(rect.getAttribute("x")))
-      .filter((rect) => !rect.classList.contains("d-none"))
-      .filter((rect) => !rect.classList.contains("fade"))
-      .forEach((rect) => {
-        const y = parseFloat(rect.getAttribute("y"));
-        const height = parseFloat(rect.getAttribute("height"));
-        const loosePixel = 2;
-        const minRatio = (y - loosePixel) / svgHeight;
-        const maxRatio = (y + height + loosePixel) / svgHeight;
-        const avgRatio = (minRatio + maxRatio) / 2;
-        if (avgRatio <= scrollRatio && scrollRatio <= maxRatio) {
-          stateText = "PERFECT";
-          rect.classList.add("fade");
-          perfectCount += 1;
-        } else if (minRatio <= scrollRatio && scrollRatio < avgRatio) {
-          stateText = "GREAT";
-          rect.classList.add("fade");
-          greatCount += 1;
-        }
-      });
-    switch (stateText) {
-      case "PERFECT":
-        state.textContent = stateText;
-        state.className = "badge bg-primary";
-        break;
-      case "GREAT":
-        state.textContent = stateText;
-        state.className = "badge bg-success";
-        break;
-      case "MISS":
-        state.className = "badge bg-danger";
-        break;
-    }
-    setTimeout(() => {
-      state.textContent = "MISS";
-      state.className = "badge";
-    }, 200);
-  };
+  if (window.TouchEvent) {
+    button.ontouchstart = () => {
+      buttonEvent(state, width, svgHeight);
+    };
+  } else {
+    button.onclick = () => {
+      buttonEvent(state, width, svgHeight);
+    };
+  }
 }
 
 function changeButtons() {
