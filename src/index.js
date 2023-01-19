@@ -226,7 +226,7 @@ function setSmoothScroll() {
 }
 
 function play() {
-  perfectCount = greatCount = 0;
+  tapCount = perfectCount = greatCount = 0;
   document.getElementById("play").classList.add("d-none");
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
@@ -697,6 +697,7 @@ let player;
 let visualizer;
 let programStates;
 let instrumentStates;
+let tapCount = 0;
 let perfectCount = 0;
 let greatCount = 0;
 loadConfig();
