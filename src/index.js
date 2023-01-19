@@ -298,12 +298,12 @@ function setInstrumentsCheckbox() {
           rect.classList.toggle("d-none");
         }
       });
-      if (visualizer && ns) {
-        changeVisualizerPositions(visualizer);
-      }
       const instrument = parseInt(instrumentId);
       const currState = instrumentStates.get(instrument);
       instrumentStates.set(parseInt(instrument), !currState);
+      if (visualizer && ns) {
+        changeVisualizerPositions(visualizer);
+      }
     });
   });
 }
@@ -330,12 +330,12 @@ function setProgramsCheckbox() {
           rect.classList.toggle("d-none");
         }
       });
-      if (visualizer && ns) {
-        changeVisualizerPositions(visualizer);
-      }
       const program = parseInt(programId);
       const currState = programStates.get(program);
       programStates.set(parseInt(program), !currState);
+      if (visualizer && ns) {
+        changeVisualizerPositions(visualizer);
+      }
     });
   });
 }
@@ -495,18 +495,13 @@ function resizeScroll() {
 function getMinMaxPitch() {
   let min = Infinity;
   let max = -Infinity;
-  // const rects = [...visualizer.svg.children];
-  // rects.forEach((rect) => {
-  //   if (!rect.classList.contains("d-none")) {
-  //     const pitch = parseInt(rect.dataset.pitch);
-  //     if (pitch < min) min = pitch;
-  //     if (max < pitch) max = pitch;
-  //   }
-  // });
-  ns.notes.forEach((note) => {
-    if (note.pitch < min) min = note.pitch;
-    if (max < note.pitch) max = note.pitch;
-  });
+  ns.notes
+    .filter((note) => instrumentStates.get(note.instrument))
+    .filter((note) => programStates.get(note.program))
+    .forEach((note) => {
+      if (note.pitch < min) min = note.pitch;
+      if (max < note.pitch) max = note.pitch;
+    });
   return [min, max];
 }
 
