@@ -626,7 +626,7 @@ function changeButtons() {
     state.className = "badge";
     state.textContent = "MISS";
     const button = document.createElement("button");
-    button.className = "w-100 btn btn-lg btn-outline-secondary";
+    button.className = "w-100 btn btn-lg btn-light";
     button.role = "button";
     button.textContent = (course > 9) ? texts[i] : texts[i * 2];
     setButtonEvent(button, state, width, svgHeight);
