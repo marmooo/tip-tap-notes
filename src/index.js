@@ -597,7 +597,7 @@ function buttonEvent(state, width, svgHeight) {
 }
 
 function setButtonEvent(button, state, width, svgHeight) {
-  if (window.TouchEvent) {
+  if ("ontouchstart" in window) {
     button.ontouchstart = () => {
       buttonEvent(state, width, svgHeight);
     };
