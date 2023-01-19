@@ -139,7 +139,7 @@ function calcPixelsPerTimeStep() {
     averageTime += note.endTime - note.startTime;
   });
   averageTime /= ns.notes.length;
-  return 30 / averageTime;
+  return noteHeight / averageTime;
 }
 
 function initVisualizer() {
@@ -684,6 +684,7 @@ function scoring() {
   document.getElementById("twitter").href = twitterUrl;
 }
 
+const noteHeight = 30;
 let ns;
 let nsCache;
 let seekbarInterval;
