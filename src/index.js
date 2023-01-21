@@ -181,6 +181,10 @@ function play() {
       setSeekbarInterval(currentTime);
     }
   }
+  window.scrollTo({
+    top: document.getElementById("playPanel").getBoundingClientRect().top,
+    behavior: "auto",
+  });
 }
 
 function pause() {
