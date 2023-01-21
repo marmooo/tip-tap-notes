@@ -67,63 +67,6 @@ function getScale(visualizer) {
   return rect.width / size.width;
 }
 
-// https://github.com/magenta/magenta-js/blob/master/music/src/core/visualizer.ts#L680
-// support responsive
-// improve performance
-function redraw(visualizer, activeNote) {
-  if (!visualizer.drawn) {
-    visualizer.draw();
-  }
-
-  if (!activeNote) {
-    return null;
-  }
-
-  const parentElement = visualizer.parentElement;
-
-  // Remove the current active note, if one exists.
-  visualizer.clearActiveNotes();
-  parentElement.style.paddingTop = parentElement.style.height;
-
-  const scale = getScale(visualizer);
-  const notes = visualizer.noteSequence.notes;
-  for (let i = 0; i < notes.length; i++) {
-    const note = notes[i];
-    const isActive = activeNote &&
-      visualizer.isPaintingActiveNote(note, activeNote);
-
-    // We're only looking to re-paint the active notes.
-    if (!isActive) {
-      continue;
-    }
-
-    // Activate this note.
-    const el = visualizer.svg.querySelector(`rect[data-index="${i}"]`);
-    visualizer.fillActiveRect(el, note);
-
-    // And on the keyboard.
-    // const key = visualizer.svgPiano.querySelector(
-    //   `rect[data-pitch="${note.pitch}"]`,
-    // );
-    // visualizer.fillActiveRect(key, note);
-
-    if (note === activeNote) {
-      const y = parseFloat(el.getAttribute("y"));
-      const height = parseFloat(el.getAttribute("height"));
-
-      // Scroll the waterfall.
-      // if (y < (parentElement.scrollTop - height)) {
-      //   parentElement.scrollTop = (y + height) * scale;
-      // }
-      parentElement.scrollTop = (y + height) * scale;
-
-      // This is the note we wanted to draw.
-      return y;
-    }
-  }
-  return null;
-}
-
 function styleToViewBox(svg) {
   const style = svg.style;
   const width = parseFloat(style.width);
@@ -157,10 +100,11 @@ function initVisualizer() {
   });
   const parentElement = visualizer.parentElement;
   parentElement.style.width = "100%";
-  parentElement.style.height = "60vh";
-  parentElement.style.paddingTop = "60vh";
+  parentElement.style.height = "50vh";
+  parentElement.style.paddingTop = "50vh";
   parentElement.style.overflowY = "hidden";
   parentElement.scrollTop = parentElement.scrollHeight;
+  currentScrollTop = parentElement.scrollTop;
   changeVisualizerPositions(visualizer);
 }
 
@@ -168,9 +112,8 @@ async function initPlayer() {
   const soundFont =
     "https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus";
   const playerCallback = {
-    run: (note) => redraw(visualizer, note),
+    run: (_note) => null,
     stop: () => {
-      visualizer.clearActiveNotes();
       clearPlayer();
       const parentElement = visualizer.parentElement;
       parentElement.scrollTop = parentElement.scrollHeight;
@@ -180,16 +123,14 @@ async function initPlayer() {
         player.start(ns);
         setSmoothScroll();
         initSeekbar(ns, 0);
+        clearInterval(seekbarInterval);
+        setSeekbarInterval(0);
       }
       scoring();
       scoreModal.show();
-      [...visualizer.svg.children]
-        .forEach((rect) => {
-          rect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
-          if (rect.classList.contains("fade")) {
-            rect.classList.remove("fade");
-          }
-        });
+      [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
+        rect.classList.remove("fade");
+      });
     },
   };
   stop();
@@ -203,24 +144,19 @@ async function initPlayer() {
   await player.loadSamples(ns);
 }
 
-function setSmoothScroll() {
-  let length = 0;
-  const delay = 10;
+function setSmoothScroll(seconds) {
+  const delay = 1;
   const totalTime = ns.totalTime;
-  const endTime = Date.now() + totalTime * 1000;
+  const startTime = Date.now() - seconds * 1000;
   const parentElement = visualizer.parentElement;
   scrollInterval = setInterval(() => {
-    if (Date.now() < endTime) {
-      const scrollHeight = parentElement.scrollHeight;
-      const unitLength = scrollHeight / totalTime * delay / 1000;
-      length += unitLength;
-      if (length >= 1) {
-        const intLength = Math.floor(length);
-        parentElement.scrollTop -= intLength;
-        length -= intLength;
-      }
+    currentTime = (Date.now() - startTime) / 1000;
+    if (currentTime < totalTime) {
+      const rate = 1 - currentTime / totalTime;
+      parentElement.scrollTop = currentScrollTop * rate;
     } else {
       clearInterval(scrollInterval);
+      currentTime = 0;
     }
   }, delay);
 }
@@ -234,14 +170,15 @@ function play() {
       if (player.getPlayState() == "started") return;
       setSpeed(ns);
       player.start(ns);
-      setSmoothScroll();
+      setSmoothScroll(0);
       initSeekbar(ns, 0);
+      clearInterval(seekbarInterval);
+      setSeekbarInterval(0);
       break;
     case "paused": {
       player.resume();
-      const seconds = parseInt(document.getElementById("seekbar").value);
-      setSeekbarInterval(seconds);
-      setSmoothScroll();
+      setSmoothScroll(currentTime);
+      setSeekbarInterval(currentTime);
     }
   }
 }
@@ -260,10 +197,10 @@ function stop() {
 }
 
 function clearPlayer() {
+  clearInterval(scrollInterval);
+  clearInterval(seekbarInterval);
   document.getElementById("play").classList.remove("d-none");
   document.getElementById("pause").classList.add("d-none");
-  clearInterval(seekbarInterval);
-  clearInterval(scrollInterval);
 }
 
 function getCheckboxString(name, label) {
@@ -374,18 +311,21 @@ function changeSpeed() {
       player.stop();
       clearInterval(seekbarInterval);
       clearInterval(scrollInterval);
-      const prevTotalTime = ns.totalTime;
       setSpeed(ns);
-      const speedChange = prevTotalTime / ns.totalTime;
-      const seconds = parseInt(document.getElementById("seekbar").value);
-      const newSeconds = seconds / speedChange;
-      player.start(ns, undefined, newSeconds);
-      setSmoothScroll();
+      const speed = nsCache.totalTime / ns.totalTime;
+      const newSeconds = currentTime / speed;
       initSeekbar(ns, newSeconds);
+      player.start(ns, undefined, newSeconds);
+      setSmoothScroll(newSeconds);
+      clearInterval(seekbarInterval);
+      setSeekbarInterval(newSeconds);
       break;
     }
     case "paused": {
-      speedChanged = true;
+      setSpeed(ns);
+      const speed = nsCache.totalTime / ns.totalTime;
+      const newSeconds = currentTime / speed;
+      initSeekbar(ns, newSeconds);
       break;
     }
   }
@@ -451,12 +391,18 @@ function formatTime(seconds) {
 function changeSeekbar(event) {
   perfectCount = greatCount = 0;
   clearInterval(seekbarInterval);
+  clearInterval(scrollInterval);
+  [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
+    rect.classList.remove("fade");
+  });
   const seconds = parseInt(event.target.value);
   document.getElementById("currentTime").textContent = formatTime(seconds);
-  resizeScroll();
+  currentTime = seconds;
+  resizeScroll(seconds);
   if (player.isPlaying()) {
     player.seekTo(seconds);
     if (player.getPlayState() == "started") {
+      setSmoothScroll(seconds);
       setSeekbarInterval(seconds);
     }
   }
@@ -473,8 +419,7 @@ function initSeekbar(ns, seconds) {
   document.getElementById("seekbar").max = ns.totalTime;
   document.getElementById("seekbar").value = seconds;
   document.getElementById("totalTime").textContent = formatTime(ns.totalTime);
-  clearInterval(seekbarInterval);
-  setSeekbarInterval(seconds);
+  document.getElementById("currentTime").textContent = formatTime(seconds);
 }
 
 function setSeekbarInterval(seconds) {
@@ -484,12 +429,18 @@ function setSeekbarInterval(seconds) {
   }, 1000);
 }
 
-function resizeScroll() {
-  const seconds = parseInt(document.getElementById("seekbar").value);
+function resize() {
   const parentElement = visualizer.parentElement;
-  const scrollSize = (ns.totalTime - seconds / ns.totalTime) *
-    parentElement.scrollHeight;
-  parentElement.scrollTop = scrollSize;
+  parentElement.scrollTop = parentElement.scrollHeight;
+  currentScrollTop = parentElement.scrollTop;
+}
+
+function resizeScroll(time) {
+  const parentElement = visualizer.parentElement;
+  parentElement.scrollTop = parentElement.scrollHeight;
+  currentScrollTop = parentElement.scrollTop;
+  const ratio = (ns.totalTime - time) / ns.totalTime;
+  parentElement.scrollTop = ratio * currentScrollTop;
 }
 
 function getMinMaxPitch() {
@@ -626,7 +577,7 @@ function changeButtons() {
     state.className = "badge";
     state.textContent = "MISS";
     const button = document.createElement("button");
-    button.className = "w-100 btn btn-lg btn-light";
+    button.className = "w-100 btn btn-light btn-tap";
     button.role = "button";
     button.textContent = (course > 9) ? texts[i] : texts[i * 2];
     setButtonEvent(button, state, width, svgHeight);
@@ -685,6 +636,8 @@ function scoring() {
 }
 
 const noteHeight = 30;
+let currentTime = 0;
+let currentScrollTop;
 let ns;
 let nsCache;
 let seekbarInterval;
@@ -725,4 +678,4 @@ document.getElementById("volumeOnOff").onclick = volumeOnOff;
 document.getElementById("volumebar").onchange = changeVolumebar;
 document.getElementById("seekbar").onchange = changeSeekbar;
 document.getElementById("courseOption").onchange = changeButtons;
-window.addEventListener("resize", resizeScroll);
+window.addEventListener("resize", resize);
