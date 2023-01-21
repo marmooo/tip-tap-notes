@@ -233,7 +233,7 @@ function setInstrumentsCheckbox() {
   node.replaceChildren(...doc.body.children);
   [...node.querySelectorAll("input")].forEach((input) => {
     input.addEventListener("change", () => {
-      perfectCount = greatCount = 0;
+      tapCount = perfectCount = greatCount = 0;
       const instrumentId = input.value;
       [...visualizer.svg.children].forEach((rect) => {
         if (rect.dataset.instrument == instrumentId) {
@@ -266,7 +266,7 @@ function setProgramsCheckbox() {
   node.replaceChildren(...doc.body.children);
   [...node.querySelectorAll("input")].forEach((input) => {
     input.addEventListener("change", () => {
-      perfectCount = greatCount = 0;
+      tapCount = perfectCount = greatCount = 0;
       const programId = input.value;
       [...visualizer.svg.children].forEach((rect) => {
         if (rect.dataset.program == programId) {
