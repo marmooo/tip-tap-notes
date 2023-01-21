@@ -148,7 +148,7 @@ async function initPlayer() {
       const repeat = repeatObj.classList.contains("active");
       if (repeat) {
         player.start(ns);
-        setSmoothScroll();
+        setSmoothScroll(0);
         initSeekbar(ns, 0);
         clearInterval(seekbarInterval);
         setSeekbarInterval(0);
@@ -172,9 +172,9 @@ async function initPlayer() {
 }
 
 function setSmoothScroll(seconds) {
+  const startTime = Date.now() - seconds * 1000;
   const delay = 1;
   const totalTime = ns.totalTime;
-  const startTime = Date.now() - seconds * 1000;
   const parentElement = visualizer.parentElement;
   scrollInterval = setInterval(() => {
     currentTime = (Date.now() - startTime) / 1000;
