@@ -14,6 +14,35 @@ function toggleDarkMode() {
   }
 }
 
+function getRandomInt(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function getRectColor() {
+  if (colorful) {
+    const r = getRandomInt(0, 127);
+    const g = getRandomInt(0, 127);
+    const b = getRandomInt(0, 127);
+    return `rgba(${r}, ${g}, ${b}, 0.5)`;
+  } else {
+    return "rgba(0, 0, 0, 0.5)";
+  }
+}
+
+function setRectColor() {
+  [...visualizer.svg.children].forEach((rect) => {
+    const color = getRectColor();
+    rect.setAttribute("fill", color);
+  });
+}
+
+function toggleRectColor() {
+  colorful = !colorful;
+  setRectColor();
+}
+
 function dropFileEvent(event) {
   event.preventDefault();
   const file = event.dataTransfer.files[0];
@@ -95,9 +124,7 @@ function initVisualizer() {
   styleToViewBox(visualizer.svg);
   styleToViewBox(visualizer.svgPiano);
   visualizer.svgPiano.classList.add("d-none");
-  [...visualizer.svg.children].forEach((rect) => {
-    rect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
-  });
+  setRectColor();
   const parentElement = visualizer.parentElement;
   parentElement.style.width = "100%";
   parentElement.style.height = "50vh";
@@ -642,6 +669,7 @@ function scoring() {
 }
 
 const noteHeight = 30;
+let colorful = true;
 let currentTime = 0;
 let currentScrollTop;
 let ns;
@@ -668,6 +696,7 @@ const scoreModal = new bootstrap.Modal("#scorePanel", {
 });
 
 document.getElementById("toggleDarkMode").onclick = toggleDarkMode;
+document.getElementById("toggleColor").onclick = toggleRectColor;
 document.ondragover = (e) => {
   e.preventDefault();
 };
