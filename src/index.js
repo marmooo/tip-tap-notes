@@ -62,9 +62,9 @@ function convertUrlEvent(event) {
 }
 
 async function convertFromUrlParams() {
-  const query = parseQuery(location.search);
-  ns = await core.urlToNoteSequence(query.url);
-  convert(ns);
+  const query = new URLSearchParams(location.search);
+  ns = await core.urlToNoteSequence(query.get("url"));
+  convert(ns, query.get("title"), query.get("composer"));
 }
 
 async function convertFromBlob(file) {
@@ -77,7 +77,11 @@ async function convertFromUrl(midiUrl) {
   convert(ns);
 }
 
-function convert(ns) {
+function convert(ns, title, composer) {
+  title ||= "";
+  composer ||= "";
+  document.getElementById("midiTitle").textContent = title;
+  document.getElementById("composer").textContent = composer;
   ns.totalTime += 3;
   ns.notes.forEach((note) => {
     note.startTime += 3;
