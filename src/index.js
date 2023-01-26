@@ -174,8 +174,8 @@ async function initPlayer() {
 }
 
 function setTimer(seconds) {
-  const startTime = Date.now() - seconds * 1000;
   const delay = 1;
+  const startTime = Date.now() - seconds * 1000;
   const totalTime = ns.totalTime;
   const parentElement = visualizer.parentElement;
   timer = setInterval(() => {
