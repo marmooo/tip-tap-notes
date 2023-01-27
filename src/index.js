@@ -94,12 +94,6 @@ function convert(ns, title, composer) {
   initPlayer();
 }
 
-function getScale(visualizer) {
-  const rect = visualizer.parentElement.getBoundingClientRect();
-  const size = visualizer.getSize();
-  return rect.width / size.width;
-}
-
 function styleToViewBox(svg) {
   const style = svg.style;
   const width = parseFloat(style.width);
@@ -199,7 +193,7 @@ function play() {
   document.getElementById("play").classList.add("d-none");
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
-    case "stopped":
+    case "stopped": {
       if (player.getPlayState() == "started") return;
       const speed = parseInt(document.getElementById("speed").value);
       setSpeed(ns, speed);
@@ -207,6 +201,7 @@ function play() {
       setTimer(0);
       initSeekbar(ns, 0);
       break;
+    }
     case "paused": {
       player.resume();
       setTimer(currentTime);
