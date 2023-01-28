@@ -64,7 +64,7 @@ function convertUrlEvent(event) {
 async function convertFromUrlParams() {
   const query = new URLSearchParams(location.search);
   ns = await core.urlToNoteSequence(query.get("url"));
-  convert(ns, query.get("title"), query.get("composer"));
+  convert(ns, query);
 }
 
 async function convertFromBlob(file) {
@@ -77,17 +77,40 @@ async function convertFromUrl(midiUrl) {
   convert(ns);
 }
 
-function convert(ns, title, composer) {
-  title ||= "";
-  composer ||= "";
+function setMIDIInfo(query) {
+  if (!(query instanceof URLSearchParams)) return;
+  const title = query.get("title");
+  const composer = query.get("composer");
+  const maintainer = query.get("maintainer");
+  const web = query.get("web");
+  const license = query.get("license");
   document.getElementById("midiTitle").textContent = title;
-  document.getElementById("composer").textContent = composer;
+  if (composer != maintainer) {
+    document.getElementById("composer").textContent = composer;
+  }
+  if (web) {
+    const a = document.createElement("a");
+    a.href = web;
+    a.textContent = maintainer;
+    document.getElementById("maintainer").replaceChildren(a);
+  } else {
+    document.getElementById("maintainer").textContent = maintainer;
+  }
+  try {
+    new URL(license);
+  } catch {
+    document.getElementById("license").textContent = license;
+  }
+}
+
+function convert(ns, query) {
   ns.totalTime += 3;
   ns.notes.forEach((note) => {
     note.startTime += 3;
     note.endTime += 3;
   });
   nsCache = core.sequences.clone(ns);
+  setMIDIInfo(query);
   setToolbar();
   initVisualizer();
   changeButtons();
@@ -650,12 +673,23 @@ function scoring() {
   document.getElementById("greatRate").textContent = greatRate + "%";
   document.getElementById("missRate").textContent = missRate + "%";
   document.getElementById("score").textContent = score;
-  const info = `title composer`;
+  const title = document.getElementById("midiTitle").textContent;
+  const composer = document.getElementById("composer").textContent;
+  const info = `${title} ${composer}`;
   const text = encodeURIComponent(`Tip Tap Notes! ${info}: ${score}`);
   const url = "https://marmooo.github.com/tip-tap-notes/";
   const twitterUrl =
     `https://twitter.com/intent/tweet?text=${text}&url=${url}&hashtags=TipTapNotes`;
   document.getElementById("twitter").href = twitterUrl;
+}
+
+function initMIDIInfo() {
+  const query = new URLSearchParams();
+  query.set("title", "When the Swallows Homeward Fly (Agathe)");
+  query.set("composer", "Franz Wilhelm Abt");
+  query.set("maintainer", "Stan Sanderson");
+  query.set("license", "Public Domain");
+  setMIDIInfo(query);
 }
 
 const noteHeight = 30;
@@ -677,6 +711,7 @@ if (location.search) {
   convertFromUrlParams();
 } else {
   convertFromUrl("abt.mid");
+  initMIDIInfo();
 }
 
 const scoreModal = new bootstrap.Modal("#scorePanel", {
