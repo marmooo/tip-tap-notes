@@ -67,14 +67,14 @@ async function convertFromUrlParams() {
   convert(ns, query);
 }
 
-async function convertFromBlob(file) {
+async function convertFromBlob(file, query) {
   ns = await core.blobToNoteSequence(file);
-  convert(ns);
+  convert(ns, query);
 }
 
-async function convertFromUrl(midiUrl) {
+async function convertFromUrl(midiUrl, query) {
   ns = await core.urlToNoteSequence(midiUrl);
-  convert(ns);
+  convert(ns, query);
 }
 
 function setMIDIInfo(query) {
@@ -683,13 +683,13 @@ function scoring() {
   document.getElementById("twitter").href = twitterUrl;
 }
 
-function initMIDIInfo() {
+function initQuery() {
   const query = new URLSearchParams();
   query.set("title", "When the Swallows Homeward Fly (Agathe)");
   query.set("composer", "Franz Wilhelm Abt");
   query.set("maintainer", "Stan Sanderson");
   query.set("license", "Public Domain");
-  setMIDIInfo(query);
+  return query;
 }
 
 const noteHeight = 30;
@@ -710,8 +710,8 @@ loadConfig();
 if (location.search) {
   convertFromUrlParams();
 } else {
-  convertFromUrl("abt.mid");
-  initMIDIInfo();
+  const query = initQuery();
+  convertFromUrl("abt.mid", query);
 }
 
 const scoreModal = new bootstrap.Modal("#scorePanel", {
