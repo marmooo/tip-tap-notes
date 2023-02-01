@@ -137,8 +137,8 @@ function calcPixelsPerTimeStep() {
 
 const MIN_NOTE_LENGTH = 1;
 class WaterfallSVGVisualizer extends core.BaseSVGVisualizer {
-  // The default range is 24 < pitch <= 96, which only considers piano,
-  // however we need 12 < pitch <= 108 when considering all instruments.
+  // The default range is 21 < pitch <= 108, which only considers piano,
+  // however we need 9 < pitch <= 120 when considering all instruments.
   NOTES_PER_OCTAVE = 12;
   WHITE_NOTES_PER_OCTAVE = 9;
   LOW_C = 12;
