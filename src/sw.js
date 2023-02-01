@@ -1,4 +1,4 @@
-var CACHE_NAME = "2023-02-01 10:50";
+var CACHE_NAME = "2023-02-01 14:10";
 var urlsToCache = [
   "/tip-tap-notes/",
   "/tip-tap-notes/index.js",
