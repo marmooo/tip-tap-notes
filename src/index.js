@@ -880,7 +880,7 @@ function typeEventKey(key) {
   const keys = Array.from("AWSEDRFTGYHUJIKOLP;@".toLowerCase());
   const playPanel = document.getElementById("playPanel");
   const buttons = [...playPanel.querySelectorAll("button")];
-  const targetKeys = (buttons.length > 9)
+  const targetKeys = (buttons.length > 10)
     ? keys.slice(0, buttons.length)
     : keys.filter((_, i) => i % 2 == 0).slice(0, buttons.length);
   if (targetKeys.includes(key)) {
@@ -966,7 +966,7 @@ function changeButtons() {
     const button = document.createElement("button");
     button.className = "w-100 btn btn-light btn-tap";
     button.role = "button";
-    button.textContent = (course > 9) ? texts[i] : texts[i * 2];
+    button.textContent = (course > 10) ? texts[i] : texts[i * 2];
     setButtonEvent(button, state, width, svgHeight);
     div.appendChild(button);
     div.appendChild(state);
