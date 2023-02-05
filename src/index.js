@@ -509,8 +509,6 @@ async function initPlayer() {
     run: (_note) => null,
     stop: () => {
       clearPlayer();
-      const parentElement = visualizer.parentElement;
-      parentElement.scrollTop = parentElement.scrollHeight;
       const repeatObj = document.getElementById("repeat");
       const repeat = repeatObj.classList.contains("active");
       if (repeat) {
@@ -828,8 +826,8 @@ function resize() {
 }
 
 function seekScroll(time) {
-  const ratio = (ns.totalTime - time) / ns.totalTime;
-  visualizer.parentElement.scrollTop = ratio * currentScrollHeight;
+  const rate = (ns.totalTime - time) / ns.totalTime;
+  visualizer.parentElement.scrollTop = currentScrollHeight * rate;
 }
 
 function getMinMaxPitch() {
