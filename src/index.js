@@ -498,8 +498,7 @@ function initVisualizer() {
   parentElement.style.height = "50vh";
   parentElement.style.paddingTop = "50vh";
   parentElement.style.overflowY = "hidden";
-  parentElement.scrollTop = parentElement.scrollHeight;
-  currentScrollTop = parentElement.scrollTop;
+  resize();
   changeVisualizerPositions(visualizer);
 }
 
@@ -824,17 +823,14 @@ function initSeekbar(ns, seconds) {
 
 function resize() {
   const parentElement = visualizer.parentElement;
-  parentElement.scrollTop = parentElement.scrollHeight;
-  currentScrollTop = parentElement.scrollTop;
+  const rectHeight = parentElement.getBoundingClientRect().height;
+  currentScrollTop = parentElement.scrollHeight - rectHeight;
   seekScroll(currentTime);
 }
 
 function seekScroll(time) {
-  const parentElement = visualizer.parentElement;
-  parentElement.scrollTop = parentElement.scrollHeight;
-  currentScrollTop = parentElement.scrollTop;
   const ratio = (ns.totalTime - time) / ns.totalTime;
-  parentElement.scrollTop = ratio * currentScrollTop;
+  visualizer.parentElement.scrollTop = ratio * currentScrollTop;
 }
 
 function getMinMaxPitch() {
