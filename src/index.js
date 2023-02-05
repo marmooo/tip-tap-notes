@@ -540,7 +540,6 @@ function setTimer(seconds) {
   const delay = 1;
   const startTime = Date.now() - seconds * 1000;
   const totalTime = ns.totalTime;
-  const parentElement = visualizer.parentElement;
   timer = setInterval(() => {
     const nextTime = (Date.now() - startTime) / 1000;
     if (Math.floor(currentTime) != Math.floor(nextTime)) {
@@ -549,7 +548,7 @@ function setTimer(seconds) {
     currentTime = nextTime;
     if (currentTime < totalTime) {
       const rate = 1 - currentTime / totalTime;
-      parentElement.scrollTop = currentScrollTop * rate;
+      visualizer.parentElement.scrollTop = currentScrollHeight * rate;
     } else {
       clearInterval(timer);
       currentTime = 0;
@@ -824,13 +823,13 @@ function initSeekbar(ns, seconds) {
 function resize() {
   const parentElement = visualizer.parentElement;
   const rectHeight = parentElement.getBoundingClientRect().height;
-  currentScrollTop = parentElement.scrollHeight - rectHeight;
+  currentScrollHeight = parentElement.scrollHeight - rectHeight;
   seekScroll(currentTime);
 }
 
 function seekScroll(time) {
   const ratio = (ns.totalTime - time) / ns.totalTime;
-  visualizer.parentElement.scrollTop = ratio * currentScrollTop;
+  visualizer.parentElement.scrollTop = ratio * currentScrollHeight;
 }
 
 function getMinMaxPitch() {
@@ -1039,7 +1038,7 @@ function initQuery() {
 const noteHeight = 30;
 let colorful = true;
 let currentTime = 0;
-let currentScrollTop;
+let currentScrollHeight;
 let ns;
 let nsCache;
 let timer;
