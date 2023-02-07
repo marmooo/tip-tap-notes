@@ -562,16 +562,14 @@ function play() {
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
     case "started":
-    case "stopped": {
+    case "stopped":
       player.start(ns, undefined, currentTime);
       setTimer(currentTime);
       break;
-    }
-    case "paused": {
+    case "paused":
       player.resume();
       setTimer(currentTime);
       break;
-    }
   }
   window.scrollTo({
     top: document.getElementById("playPanel").getBoundingClientRect().top,
