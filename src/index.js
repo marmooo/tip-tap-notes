@@ -561,18 +561,16 @@ function play() {
   document.getElementById("play").classList.add("d-none");
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
+    case "started":
     case "stopped": {
-      if (player.getPlayState() == "started") return;
-      const speed = parseInt(document.getElementById("speed").value);
-      setSpeed(ns, speed);
-      player.start(ns);
-      setTimer(0);
-      initSeekbar(ns, 0);
+      player.start(ns, undefined, currentTime);
+      setTimer(currentTime);
       break;
     }
     case "paused": {
       player.resume();
       setTimer(currentTime);
+      break;
     }
   }
   window.scrollTo({
@@ -703,27 +701,19 @@ function speedUp() {
 function changeSpeed(speed) {
   perfectCount = greatCount = 0;
   if (!ns) return;
-  switch (player.getPlayState()) {
-    case "started": {
-      player.stop();
-      clearInterval(timer);
-      const prevRate = nsCache.totalTime / ns.totalTime;
-      const rate = prevRate / (speed / 100);
-      const newSeconds = currentTime * rate;
-      setSpeed(ns, speed);
-      initSeekbar(ns, newSeconds);
+  const playState = player.getPlayState();
+  player.stop();
+  clearInterval(timer);
+  const prevRate = nsCache.totalTime / ns.totalTime;
+  const rate = prevRate / (speed / 100);
+  const newSeconds = currentTime * rate;
+  setSpeed(ns, speed);
+  initSeekbar(ns, newSeconds);
+  switch (playState) {
+    case "started":
       player.start(ns, undefined, newSeconds);
       setTimer(newSeconds);
       break;
-    }
-    case "paused": {
-      setSpeed(ns, speed);
-      const prevRate = nsCache.totalTime / ns.totalTime;
-      const rate = prevRate / (speed / 100);
-      const newSeconds = currentTime * rate;
-      initSeekbar(ns, newSeconds);
-      break;
-    }
   }
 }
 
@@ -791,6 +781,8 @@ function formatTime(seconds) {
 
 function changeSeekbar(event) {
   perfectCount = greatCount = 0;
+  const playState = player.getPlayState();
+  player.stop();
   clearInterval(timer);
   [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
     rect.classList.remove("fade");
@@ -799,11 +791,9 @@ function changeSeekbar(event) {
   document.getElementById("currentTime").textContent = formatTime(seconds);
   currentTime = seconds;
   seekScroll(seconds);
-  if (player.isPlaying()) {
-    player.seekTo(seconds);
-    if (player.getPlayState() == "started") {
-      setTimer(seconds);
-    }
+  if (playState == "started") {
+    player.start(ns, undefined, seconds);
+    setTimer(seconds);
   }
 }
 
