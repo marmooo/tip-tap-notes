@@ -684,7 +684,7 @@ function setToolbar() {
 function speedDown() {
   const input = document.getElementById("speed");
   const value = parseInt(input.value) - 10;
-  const speed = (value < 0) ? 0 : value;
+  const speed = (value <= 0) ? 1 : value;
   input.value = speed;
   document.getElementById("speedDown").disabled = true;
   changeSpeed(speed);
@@ -733,6 +733,7 @@ function changeSpeedEvent(event) {
 }
 
 function setSpeed(ns, speed) {
+  if (speed <= 0) speed = 1;
   speed /= 100;
   const controlChanges = nsCache.controlChanges;
   ns.controlChanges.forEach((n, i) => {
