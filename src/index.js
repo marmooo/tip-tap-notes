@@ -110,10 +110,18 @@ function setMIDIInfo(query) {
 }
 
 function convert(ns, query) {
+  longestDuration = -Infinity;
   ns.totalTime += 3;
   ns.notes.forEach((note) => {
     note.startTime += 3;
     note.endTime += 3;
+    const duration = (note.endTime - note.startTime);
+    if (longestDuration < duration) longestDuration = duration;
+  });
+  ns.notes = ns.notes.sort((a, b) => {
+    if (a.startTime < b.startTime) return -1;
+    if (a.startTime > b.startTime) return 1;
+    return 0;
   });
   nsCache = core.sequences.clone(ns);
   setMIDIInfo(query);
@@ -561,8 +569,8 @@ function setLoadingTimer(time) {
   const loadingTimer = setInterval(() => {
     if (player.isPlaying()) {
       clearInterval(loadingTimer);
-      player.seekTo(time);
-      setTimer(time);
+      player.seekTo(currentTime);
+      setTimer(currentTime);
     }
   }, 10);
 }
@@ -891,13 +899,35 @@ function typeEventKey(key) {
   }
 }
 
-function buttonEvent(state, width, svgHeight) {
+function searchNotePosition(notes, time) {
+  let left = 0;
+  let right = notes.length - 1;
+  let mid;
+  while (left <= right) {
+    mid = Math.floor((left + right) / 2);
+    if (notes[mid].startTime > time) {
+      right = mid - 1;
+    } else if (notes[mid].startTime < time) {
+      left = mid + 1;
+    } else {
+      return mid;
+    }
+  }
+  return mid;
+}
+
+function buttonEvent(state, x, svgHeight) {
   tapCount += 1;
   const waterfallHeight = visualizer.svg.getBoundingClientRect().height;
   const scrollRatio = visualizer.parentElement.scrollTop / waterfallHeight;
   let stateText = "MISS";
-  [...visualizer.svg.children]
-    .filter((rect) => width == parseInt(rect.getAttribute("x")))
+  const looseTime = 1;
+  const startTime = currentTime - longestDuration - looseTime;
+  const startPos = searchNotePosition(ns.notes, startTime);
+  const endTime = currentTime + looseTime;
+  const endPos = searchNotePosition(ns.notes, endTime) + 1;
+  [...visualizer.svg.children].slice(startPos, endPos)
+    .filter((rect) => x == parseInt(rect.getAttribute("x")))
     .filter((rect) => !rect.classList.contains("d-none"))
     .filter((rect) => !rect.classList.contains("fade"))
     .forEach((rect) => {
@@ -936,14 +966,14 @@ function buttonEvent(state, width, svgHeight) {
   }, 200);
 }
 
-function setButtonEvent(button, state, width, svgHeight) {
+function setButtonEvent(button, state, x, svgHeight) {
   if ("ontouchstart" in window) {
     button.ontouchstart = () => {
-      buttonEvent(state, width, svgHeight);
+      buttonEvent(state, x, svgHeight);
     };
   } else {
     button.onclick = () => {
-      buttonEvent(state, width, svgHeight);
+      buttonEvent(state, x, svgHeight);
     };
   }
 }
@@ -957,9 +987,9 @@ function changeButtons() {
   const viewBox = visualizer.svg.getAttribute("viewBox").split(" ");
   const svgWidth = parseFloat(viewBox[2]);
   const svgHeight = parseFloat(viewBox[3]);
-  const widthStep = svgWidth / course;
+  const xStep = svgWidth / course;
   for (let i = 0; i < course; i++) {
-    const width = Math.ceil(i * widthStep);
+    const x = Math.ceil(i * xStep);
     const div = document.createElement("div");
     div.className = "w-100";
     const state = document.createElement("span");
@@ -969,7 +999,7 @@ function changeButtons() {
     button.className = "w-100 btn btn-light btn-tap";
     button.role = "button";
     button.textContent = (course > 10) ? texts[i] : texts[i * 2];
-    setButtonEvent(button, state, width, svgHeight);
+    setButtonEvent(button, state, x, svgHeight);
     div.appendChild(button);
     div.appendChild(state);
     playPanel.appendChild(div);
@@ -1039,6 +1069,7 @@ const noteHeight = 30;
 let colorful = true;
 let currentTime = 0;
 let currentScrollHeight;
+let longestDuration;
 let ns;
 let nsCache;
 let timer;
