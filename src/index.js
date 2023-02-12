@@ -809,8 +809,8 @@ function changeSeekbar(event) {
   currentTime = seconds;
   seekScroll(seconds);
   if (playState == "started") {
+    player.start(ns, undefined, currentTime / ns.ticksPerQuarter);
     setLoadingTimer(seconds);
-    player.start(ns, undefined, currentTime - seconds);
   }
 }
 
