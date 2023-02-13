@@ -569,7 +569,7 @@ function setLoadingTimer(time) {
   const loadingTimer = setInterval(() => {
     if (player.isPlaying()) {
       clearInterval(loadingTimer);
-      player.seekTo(currentTime);
+      player.seekTo(time);
       setTimer(currentTime);
     }
   }, 10);
