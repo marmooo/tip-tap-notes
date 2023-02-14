@@ -887,16 +887,13 @@ function typeEvent(event) {
 }
 
 function typeEventKey(key) {
-  const keys = Array.from("AWSEDRFTGYHUJIKOLP;@".toLowerCase());
-  const playPanel = document.getElementById("playPanel");
-  const buttons = [...playPanel.querySelectorAll("button")];
-  const targetKeys = (buttons.length > 10)
-    ? keys.slice(0, buttons.length)
-    : keys.filter((_, i) => i % 2 == 0).slice(0, buttons.length);
-  if (targetKeys.includes(key)) {
-    const pos = targetKeys.indexOf(key);
-    buttons[pos].click();
-  }
+  const course = document.getElementById("courseOption").selectedIndex;
+  const letters = Array.from("AWSEDRFTGYHUJIKOLP;@".toLowerCase());
+  const targetLetters = (course > 10)
+    ? letters.slice(0, course)
+    : letters.filter((_, i) => i % 2 == 0).slice(0, course);
+  const pos = targetLetters.indexOf(key);
+  if (pos != -1) keyEvents[pos]();
 }
 
 function searchNotePosition(notes, time) {
@@ -967,15 +964,15 @@ function buttonEvent(state, x, svgHeight) {
 }
 
 function setButtonEvent(button, state, x, svgHeight) {
+  const ev = () => {
+    buttonEvent(state, x, svgHeight);
+  };
   if ("ontouchstart" in window) {
-    button.ontouchstart = () => {
-      buttonEvent(state, x, svgHeight);
-    };
+    button.ontouchstart = ev;
   } else {
-    button.onclick = () => {
-      buttonEvent(state, x, svgHeight);
-    };
+    button.onclick = ev;
   }
+  keyEvents.push(ev);
 }
 
 function changeButtons() {
@@ -1066,6 +1063,7 @@ function initQuery() {
 }
 
 const noteHeight = 30;
+let keyEvents = [];
 let colorful = true;
 let currentTime = 0;
 let currentScrollHeight;
