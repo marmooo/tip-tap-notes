@@ -570,7 +570,7 @@ function setLoadingTimer(time) {
     if (player.isPlaying()) {
       clearInterval(loadingTimer);
       player.seekTo(time);
-      setTimer(currentTime);
+      setTimer(time);
     }
   }, 10);
 }
