@@ -977,6 +977,7 @@ function setButtonEvent(button, state, x, svgHeight) {
 
 function changeButtons() {
   tapCount = perfectCount = greatCount = 0;
+  keyEvents = [];
   const texts = Array.from("AWSEDRFTGYHUJIKOLP;@");
   const course = document.getElementById("courseOption").selectedIndex;
   const playPanel = document.getElementById("playPanel");
