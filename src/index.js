@@ -48,31 +48,31 @@ function dropFileEvent(event) {
   const file = event.dataTransfer.files[0];
   const dt = new DataTransfer();
   dt.items.add(file);
-  const input = document.getElementById("inputFile");
+  const input = document.getElementById("inputMIDIFile");
   input.files = dt.files;
-  convertFromBlob(file);
+  loadMIDIFromBlob(file);
 }
 
-function convertFileEvent(event) {
-  convertFromBlob(event.target.files[0]);
+function loadMIDIFileEvent(event) {
+  loadMIDIFromBlob(event.target.files[0]);
 }
 
-function convertUrlEvent(event) {
-  convertFromUrl(event.target.value);
+function loadMIDIUrlEvent(event) {
+  loadMIDIFromUrl(event.target.value);
 }
 
-async function convertFromUrlParams() {
+async function loadMIDIFromUrlParams() {
   const query = new URLSearchParams(location.search);
   ns = await core.urlToNoteSequence(query.get("url"));
   convert(ns, query);
 }
 
-async function convertFromBlob(file, query) {
+async function loadMIDIFromBlob(file, query) {
   ns = await core.blobToNoteSequence(file);
   convert(ns, query);
 }
 
-async function convertFromUrl(midiUrl, query) {
+async function loadMIDIFromUrl(midiUrl, query) {
   ns = await core.urlToNoteSequence(midiUrl);
   convert(ns, query);
 }
@@ -110,13 +110,23 @@ function setMIDIInfo(query) {
 }
 
 function convert(ns, query) {
+  const waitTime = 3;
   longestDuration = -Infinity;
-  ns.totalTime += 3;
+  ns.totalTime += waitTime;
   ns.notes.forEach((note) => {
-    note.startTime += 3;
-    note.endTime += 3;
-    const duration = (note.endTime - note.startTime);
+    note.startTime += waitTime;
+    note.endTime += waitTime;
+    const duration = note.endTime - note.startTime;
     if (longestDuration < duration) longestDuration = duration;
+  });
+  ns.controlChanges.forEach((cc) => {
+    cc.time += waitTime;
+  });
+  ns.tempos.slice(1).forEach((tempo) => {
+    tempo.time += waitTime;
+  });
+  ns.timeSignatures.slice(1).forEach((ts) => {
+    ts.time += waitTime;
   });
   ns.notes = ns.notes.sort((a, b) => {
     if (a.startTime < b.startTime) return -1;
@@ -129,6 +139,22 @@ function convert(ns, query) {
   initVisualizer();
   changeButtons();
   initPlayer();
+}
+
+async function loadSoundFontFileEvent(event) {
+  if (player) {
+    const file = event.target.files[0];
+    const soundFontBuffer = await file.arrayBuffer();
+    await player.loadSoundFontBuffer(soundFontBuffer);
+  }
+}
+
+async function loadSoundFontUrlEvent(event) {
+  if (player) {
+    const response = await fetch(event.target.value);
+    const soundFontBuffer = await response.arrayBuffer();
+    await player.loadSoundFontBuffer(soundFontBuffer);
+  }
 }
 
 function styleToViewBox(svg) {
@@ -510,44 +536,274 @@ function initVisualizer() {
   changeVisualizerPositions(visualizer);
 }
 
-async function initPlayer() {
-  const soundFont =
-    "https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus";
-  const playerCallback = {
-    run: (_note) => null,
-    stop: () => {
-      clearPlayer();
-      const repeatObj = document.getElementById("repeat");
-      const repeat = repeatObj.classList.contains("active");
-      if (repeat) {
-        initSeekbar(ns, 0);
-        setLoadingTimer(0);
-        player.start(ns);
+class MagentaPlayer extends core.SoundFontPlayer {
+  constructor(ns, runCallback, stopCallback) {
+    const soundFontUrl =
+      "https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus";
+    const callback = {
+      run: (note) => runCallback(note),
+      stop: () => stopCallback(),
+    };
+    super(soundFontUrl, undefined, undefined, undefined, callback);
+    this.ns = ns;
+    this.output.volume.value = 20 * Math.log(0.5) / Math.log(10);
+  }
+
+  loadSamples(ns) {
+    return super.loadSamples(ns).then(() => {
+      this.synth = true;
+    });
+  }
+
+  start(ns) {
+    return super.start(ns);
+  }
+
+  restart(seconds) {
+    if (seconds) super.start(ns, undefined, seconds / ns.ticksPerQuarter);
+    return this.start(this.ns);
+  }
+
+  stop(callStop) {
+    if (!callStop) super.stop();
+  }
+
+  resume(seconds) {
+    super.resume();
+    this.seekTo(seconds);
+  }
+
+  changeVolume(volume) {
+    // 0 <= volume <= 100 --> 1e-5 <= dB <= 1 --> -100 <= slider <= 0
+    if (volume == 0) {
+      volume = -100;
+    } else {
+      volume = 20 * Math.log(volume / 100) / Math.log(10);
+    }
+    this.output.volume.value = volume;
+  }
+
+  changeMute(status) {
+    this.output.mute = status;
+  }
+}
+
+class SoundFontPlayer {
+  constructor(stopCallback) {
+    this.context = new AudioContext();
+    this.state = "stopped";
+    this.callStop = false;
+    this.stopCallback = stopCallback;
+    this.prevGain = 0.5;
+    this.cacheUrls = new Array(128);
+  }
+
+  async loadSoundFontDir(ns, dir) {
+    const programs = new Set();
+    ns.notes.forEach((note) => programs.add(note.program));
+    const promises = [...programs].map((program) => {
+      const programId = program.toString().padStart(3, "0");
+      const url = `${dir}/${programId}.sf3`;
+      if (this.cacheUrls[program]) return false;
+      if (this.cacheUrls[program] == url) return true;
+      this.cacheUrls[program] = url;
+      return this.fetchBuffer(url);
+    });
+    const buffers = await Promise.all(promises);
+    for (const buffer of buffers) {
+      if (buffer instanceof ArrayBuffer) {
+        await this.loadSoundFontBuffer(buffer);
       }
-      scoring();
-      scoreModal.show();
-      [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
-        rect.classList.remove("fade");
-      });
-    },
-  };
-  stop();
-  player = new core.SoundFontPlayer(
-    soundFont,
-    undefined,
-    undefined,
-    undefined,
-    playerCallback,
-  );
+    }
+  }
+
+  async fetchBuffer(url) {
+    const response = await fetch(url);
+    if (response.status == 200) {
+      return await response.arrayBuffer();
+    } else {
+      return undefined;
+    }
+  }
+
+  async loadSoundFontUrl(url) {
+    const buffer = await this.fetchBuffer(url);
+    const soundFontId = await this.loadSoundFontBuffer(buffer);
+    return soundFontId;
+  }
+
+  async loadSoundFontBuffer(soundFontBuffer) {
+    if (this.synth) {
+      await this.synth.unloadSFontAsync(this.soundFontId);
+    } else {
+      await this.context.audioWorklet.addModule(
+        "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
+      );
+      await this.context.audioWorklet.addModule(
+        "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.worklet.min.js",
+      );
+      this.synth = new JSSynth.AudioWorkletNodeSynthesizer();
+      this.synth.init(this.context.sampleRate);
+      const node = this.synth.createAudioNode(this.context);
+      node.connect(this.context.destination);
+    }
+    const soundFontId = await this.synth.loadSFont(soundFontBuffer);
+    return soundFontId;
+  }
+
+  async loadNoteSequence(ns) {
+    await this.synth.resetPlayer();
+    this.ns = ns;
+    const midiBuffer = core.sequenceProtoToMidi(ns);
+    return player.synth.addSMFDataToPlayer(midiBuffer);
+  }
+
+  resumeContext() {
+    this.context.resume();
+  }
+
+  async restart(seconds) {
+    this.state = "started";
+    await this.synth.playPlayer();
+    this.seekTo(seconds);
+    await this.synth.waitForPlayerStopped();
+    await this.synth.waitForVoicesStopped();
+    if (this.callStop) {
+      this.stopCallback();
+      this.callStop = false;
+    }
+  }
+
+  async start(ns, _qpm, seconds) {
+    if (ns) await this.loadNoteSequence(ns);
+    if (seconds) this.seekTo(seconds);
+    this.restart();
+  }
+
+  stop(callStop) {
+    if (this.isPlaying()) {
+      this.state = "stopped";
+      this.callStop = callStop;
+      this.synth.stopPlayer();
+      this.seekTo(0);
+    } else if (callStop) {
+      this.callStop = callStop;
+      this.seekTo(0);
+      this.stopCallback();
+    }
+  }
+
+  pause() {
+    this.state = "paused";
+    this.synth.stopPlayer();
+  }
+
+  resume(seconds) {
+    this.restart(seconds);
+  }
+
+  changeVolume(volume) {
+    // 0 <= volume <= 1
+    volume = volume / 100;
+    this.synth.setGain(volume);
+  }
+
+  changeMute(status) {
+    if (status) {
+      this.prevGain = this.synth.getGain();
+      this.synth.setGain(0);
+    } else {
+      this.synth.setGain(this.prevGain);
+    }
+  }
+
+  calcTick(seconds) {
+    let tick = 0;
+    let prevTime = 0;
+    let prevQpm = 120;
+    for (const tempo of this.ns.tempos) {
+      const currTime = tempo.time;
+      const currQpm = tempo.qpm;
+      if (currTime < seconds) {
+        const t = currTime - prevTime;
+        tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
+      } else {
+        const t = seconds - prevTime;
+        tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
+        return tick;
+      }
+      prevTime = currTime;
+      prevQpm = currQpm;
+    }
+    const t = seconds - prevTime;
+    tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
+    return tick;
+  }
+
+  seekTo(seconds) {
+    const tick = this.calcTick(seconds);
+    this.synth.seekPlayer(tick);
+  }
+
+  isPlaying() {
+    if (!this.synth) return false;
+    return this.synth.isPlaying();
+  }
+
+  getPlayState() {
+    if (!this.synth) return "stopped";
+    if (this.synth.isPlaying()) return "started";
+    return this.state;
+  }
+}
+
+function stopCallback() {
+  clearPlayer();
+  const repeatObj = document.getElementById("repeat");
+  const repeat = repeatObj.classList.contains("active");
+  if (repeat) {
+    initSeekbar(ns, 0);
+    setLoadingTimer(0);
+    player.restart();
+  }
+  scoring();
+  scoreModal.show();
+  [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
+    rect.classList.remove("fade");
+  });
+}
+
+async function initPlayer() {
+  disableController();
+  if (player && player.isPlaying()) stop();
   currentTime = 0;
   initSeekbar(ns, 0);
-  await player.loadSamples(ns);
+
+  // // Magenta.js
+  // const runCallback = () => {};
+  // player = new MagentaPlayer(ns, runCallback, stopCallback);
+  // await player.loadSamples(ns);
+
+  // js-synthesizer
+  player = new SoundFontPlayer(stopCallback);
+  await loadSoundFont();
+
+  enableController();
+}
+
+async function loadSoundFont() {
+  if (player instanceof SoundFontPlayer) {
+    const soundFontDir = "https://soundfonts.pages.dev/GeneralUser_GS_v1.471";
+    await player.loadSoundFontDir(ns, soundFontDir);
+    await player.loadNoteSequence(ns);
+  }
 }
 
 function setTimer(seconds) {
   const delay = 1;
   const startTime = Date.now() - seconds * 1000;
   const totalTime = ns.totalTime;
+  clearInterval(timer);
   timer = setInterval(() => {
     const nextTime = (Date.now() - startTime) / 1000;
     if (Math.floor(currentTime) != Math.floor(nextTime)) {
@@ -558,8 +814,11 @@ function setTimer(seconds) {
       const rate = 1 - currentTime / totalTime;
       visualizer.parentElement.scrollTop = currentScrollHeight * rate;
     } else {
+      stop(true);
       clearInterval(timer);
       currentTime = 0;
+      visualizer.parentElement.scrollTop =
+        visualizer.parentElement.scrollHeight;
     }
   }, delay);
 }
@@ -571,23 +830,48 @@ function setLoadingTimer(time) {
       clearInterval(loadingTimer);
       player.seekTo(time);
       setTimer(time);
+      enableController();
     }
   }, 10);
 }
 
+function disableController() {
+  controllerDisabled = true;
+  const target = document.getElementById("controller")
+    .querySelectorAll("button, input");
+  [...target].forEach((node) => {
+    node.disabled = true;
+  });
+}
+
+function enableController() {
+  controllerDisabled = false;
+  const target = document.getElementById("controller")
+    .querySelectorAll("button, input");
+  [...target].forEach((node) => {
+    node.disabled = false;
+  });
+}
+
+function unlockAudio() {
+  player.resumeContext();
+}
+
 function play() {
   tapCount = perfectCount = greatCount = 0;
+  disableController();
   document.getElementById("play").classList.add("d-none");
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
     case "started":
     case "stopped":
       setLoadingTimer(currentTime);
-      player.start(ns);
+      player.restart();
       break;
     case "paused":
-      player.resume();
+      player.resume(currentTime);
       setTimer(currentTime);
+      enableController();
       break;
   }
   window.scrollTo({
@@ -601,12 +885,10 @@ function pause() {
   clearPlayer();
 }
 
-function stop() {
-  if (player && player.isPlaying()) {
-    document.getElementById("currentTime").textContent = formatTime(0);
-    player.stop();
-    clearPlayer();
-  }
+function stop(callStop) {
+  document.getElementById("currentTime").textContent = formatTime(0);
+  player.stop(callStop);
+  clearPlayer();
 }
 
 function clearPlayer() {
@@ -697,25 +979,23 @@ function setToolbar() {
 }
 
 function speedDown() {
+  if (player.isPlaying()) disableController();
   const input = document.getElementById("speed");
   const value = parseInt(input.value) - 10;
   const speed = (value <= 0) ? 1 : value;
   input.value = speed;
-  document.getElementById("speedDown").disabled = true;
   changeSpeed(speed);
-  document.getElementById("speedDown").disabled = false;
 }
 
 function speedUp() {
+  if (player.isPlaying()) disableController();
   const input = document.getElementById("speed");
   const speed = parseInt(input.value) + 10;
   input.value = speed;
-  document.getElementById("speedUp").disabled = true;
   changeSpeed(speed);
-  document.getElementById("speedUp").disabled = false;
 }
 
-function changeSpeed(speed) {
+async function changeSpeed(speed) {
   perfectCount = greatCount = 0;
   if (!ns) return;
   const playState = player.getPlayState();
@@ -726,15 +1006,17 @@ function changeSpeed(speed) {
   const newSeconds = currentTime * rate;
   setSpeed(ns, speed);
   initSeekbar(ns, newSeconds);
-  switch (playState) {
-    case "started":
-      setLoadingTimer(newSeconds);
-      player.start(ns);
-      break;
+  if (playState == "started") {
+    setLoadingTimer(newSeconds);
+    player.start(ns);
+  } else if (player instanceof SoundFontPlayer) {
+    await player.loadNoteSequence(ns);
+    player.seekTo(newSeconds);
   }
 }
 
 function changeSpeedEvent(event) {
+  if (player.isPlaying()) disableController();
   const speed = parseInt(event.target.value);
   changeSpeed(speed);
 }
@@ -750,6 +1032,10 @@ function setSpeed(ns, speed) {
   ns.tempos.forEach((n, i) => {
     n.time = tempos[i].time / speed;
     n.qpm = tempos[i].qpm * speed;
+  });
+  const timeSignatures = nsCache.timeSignatures;
+  ns.timeSignatures.forEach((n, i) => {
+    n.time = timeSignatures[i].time / speed;
   });
   const notes = nsCache.notes;
   ns.notes.forEach((n, i) => {
@@ -769,20 +1055,20 @@ function volumeOnOff() {
   if (i.classList.contains("bi-volume-up-fill")) {
     i.className = "bi bi-volume-mute-fill";
     volumebar.dataset.value = volumebar.value;
-    volumebar.value = -50;
-    player.output.mute = true;
+    volumebar.value = 0;
+    player.changeMute(true);
   } else {
     i.className = "bi bi-volume-up-fill";
     volumebar.value = volumebar.dataset.value;
-    player.output.mute = false;
+    player.changeMute(false);
   }
 }
 
 function changeVolumebar() {
   const volumebar = document.getElementById("volumebar");
-  const volume = volumebar.value;
+  const volume = parseInt(volumebar.value);
   volumebar.dataset.value = volume;
-  player.output.volume.value = volume;
+  player.changeVolume(volume);
 }
 
 function formatTime(seconds) {
@@ -798,19 +1084,16 @@ function formatTime(seconds) {
 
 function changeSeekbar(event) {
   perfectCount = greatCount = 0;
-  const playState = player.getPlayState();
-  player.stop();
   clearInterval(timer);
   [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
     rect.classList.remove("fade");
   });
-  const seconds = parseInt(event.target.value);
-  document.getElementById("currentTime").textContent = formatTime(seconds);
-  currentTime = seconds;
-  seekScroll(seconds);
-  if (playState == "started") {
-    player.start(ns, undefined, currentTime / ns.ticksPerQuarter);
-    setLoadingTimer(seconds);
+  currentTime = parseInt(event.target.value);
+  document.getElementById("currentTime").textContent = formatTime(currentTime);
+  seekScroll(currentTime);
+  if (player.getPlayState() == "started") {
+    player.seekTo(currentTime);
+    setTimer(currentTime);
   }
 }
 
@@ -872,6 +1155,9 @@ function changeVisualizerPositions(visualizer) {
 }
 
 function typeEvent(event) {
+  if (!player || !player.synth) return;
+  if (controllerDisabled) return;
+  player.resumeContext();
   switch (event.code) {
     case "Space":
       event.preventDefault();
@@ -1064,6 +1350,7 @@ function initQuery() {
 }
 
 const noteHeight = 30;
+let controllerDisabled;
 let keyEvents = [];
 let colorful = true;
 let currentTime = 0;
@@ -1081,10 +1368,10 @@ let perfectCount = 0;
 let greatCount = 0;
 loadConfig();
 if (location.search) {
-  convertFromUrlParams();
+  loadMIDIFromUrlParams();
 } else {
   const query = initQuery();
-  convertFromUrl("abt.mid", query);
+  loadMIDIFromUrl("abt.mid", query);
 }
 
 const scoreModal = new bootstrap.Modal("#scorePanel", {
@@ -1098,8 +1385,10 @@ document.ondragover = (e) => {
   e.preventDefault();
 };
 document.ondrop = dropFileEvent;
-document.getElementById("inputFile").onchange = convertFileEvent;
-document.getElementById("inputUrl").onchange = convertUrlEvent;
+document.getElementById("inputMIDIFile").onchange = loadMIDIFileEvent;
+document.getElementById("inputMIDIUrl").onchange = loadMIDIUrlEvent;
+document.getElementById("inputSoundFontFile").onchange = loadSoundFontFileEvent;
+document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
 document.getElementById("play").onclick = play;
 document.getElementById("pause").onclick = pause;
 document.getElementById("speed").onchange = changeSpeedEvent;
@@ -1111,3 +1400,7 @@ document.getElementById("volumebar").onchange = changeVolumebar;
 document.getElementById("seekbar").onchange = changeSeekbar;
 document.getElementById("courseOption").onchange = changeButtons;
 window.addEventListener("resize", resize);
+document.addEventListener("click", unlockAudio, {
+  once: true,
+  useCapture: true,
+});
