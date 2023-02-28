@@ -95,7 +95,8 @@
               <option>19</option>
               <option>20</option>
             </select>
-            <button title="toggle color" id="toggleColor" class="fs-4 btn p-0 ms-1" type="button">🌈</button>
+            <button title="configuration" id="config" class="fs-4 btn p-0 ms-1"
+              data-bs-toggle="offcanvas" data-bs-target="#configPanel" aria-controls="configPanel">⚙️</button>
             <button title="toggle dark-mode" id="toggleDarkMode" class="fs-4 btn p-0 ms-1" type="button">🌓</button>
           </div>
         </div>
@@ -108,34 +109,6 @@
       <p>Tap notes! A waterfall style MIDI notes tap game.
       It is suitable for classical music with few instruments.
       </p>
-      <div class="row">
-        <div class="col-sm">
-          <div class="card">
-            <div class="card-header">Select MIDI</div>
-            <div class="card-body">
-              <input title="Select MIDI" type="file" class="form-control" id="inputMIDIFile" accept=".mid">
-              <div class="input-group">
-                <label class="input-group-text" for="inputMIDIUrl">Browse URL</label>
-                <input title="Browse URL" type="url" class="form-control" id="inputMIDIUrl"
-                  placeholder="https://marmooo.github.io/tip-tap-notes/abt.mid">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-sm">
-          <div class="card">
-            <div class="card-header">Select SoundFont (.sf2, .sf3)</div>
-            <div class="card-body">
-              <input title="Select SoundFont" type="file" class="form-control" id="inputSoundFontFile" accept=".sf2, .sf3">
-              <div class="input-group">
-                <label class="input-group-text" for="inputSoundFontUrl">Browse URL</label>
-                <input title="Browse URL" type="url" class="form-control" id="inputSoundFontUrl"
-                  placeholder="https://soundfonts.pages.dev/TimGM6mb.128.sf3">
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
       <div id="controller" class="d-flex flex-wrap justify-content-between my-2">
         <div class="d-flex">
           <div class="d-inline">
@@ -215,6 +188,33 @@
             <div class="modal-footer">
               <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Close</button>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="configPanel" aria-labelledby="configPanelLabel">
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title" id="configPanelLabel">Configuration</h5>
+          <button class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" type="button"></button>
+        </div>
+        <div class="offcanvas-body">
+          <h6 class="pt-4">UI</h6>
+          <button title="toggle color" id="toggleColor" class="fs-4 btn p-0 ms-1" type="button">🌈</button>
+          <h6 class="pt-4">MIDI</h6>
+          <input title="Select MIDI" type="file" class="form-control" id="inputMIDIFile" accept=".mid">
+          <div class="input-group">
+            <label class="input-group-text" for="inputMIDIUrl">Browse URL</label>
+            <input title="Browse URL" type="url" class="form-control" id="inputMIDIUrl"
+              placeholder="https://marmooo.github.io/tip-tap-notes/abt.mid">
+          </div>
+          <h6 class="pt-4">Soundfonts</h6>
+          <select title="play on selected soundfont" id="soundfonts" class="form-select form-select-sm w-auto">
+            <option disabled>Select soundfont</option>
+          </select>
+          <input title="Select SoundFont" type="file" class="form-control mt-3" id="inputSoundFontFile" accept=".sf2, .sf3">
+          <div class="input-group">
+            <label class="input-group-text" for="inputSoundFontUrl">Browse URL</label>
+            <input title="Browse URL" type="url" class="form-control" id="inputSoundFontUrl"
+              placeholder="https://soundfonts.pages.dev/TimGM6mb.128.sf3">
           </div>
         </div>
       </div>

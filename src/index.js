@@ -143,6 +143,7 @@ function convert(ns, query) {
 
 async function loadSoundFontFileEvent(event) {
   if (player) {
+    document.getElementById("soundfonts").options[0].selected = true;
     const file = event.target.files[0];
     const soundFontBuffer = await file.arrayBuffer();
     await player.loadSoundFontBuffer(soundFontBuffer);
@@ -151,6 +152,7 @@ async function loadSoundFontFileEvent(event) {
 
 async function loadSoundFontUrlEvent(event) {
   if (player) {
+    document.getElementById("soundfonts").options[0].selected = true;
     const response = await fetch(event.target.value);
     const soundFontBuffer = await response.arrayBuffer();
     await player.loadSoundFontBuffer(soundFontBuffer);
@@ -604,7 +606,6 @@ class SoundFontPlayer {
     const promises = [...programs].map((program) => {
       const programId = program.toString().padStart(3, "0");
       const url = `${dir}/${programId}.sf3`;
-      if (this.cacheUrls[program]) return false;
       if (this.cacheUrls[program] == url) return true;
       this.cacheUrls[program] = url;
       return this.fetchBuffer(url);
@@ -786,14 +787,23 @@ async function initPlayer() {
 
   // js-synthesizer
   player = new SoundFontPlayer(stopCallback);
-  await loadSoundFont();
+  if (firstRun) {
+    firstRun = false;
+    await loadSoundFont("GeneralUser_GS_v1");
+  } else {
+    await loadSoundFont();
+  }
 
   enableController();
 }
 
-async function loadSoundFont() {
+async function loadSoundFont(name) {
   if (player instanceof SoundFontPlayer) {
-    const soundFontDir = "https://soundfonts.pages.dev/GeneralUser_GS_v1.471";
+    if (!name) {
+      const soundfonts = document.getElementById("soundfonts")
+      name = soundfonts.options[soundfonts.selectedIndex].value;
+    }
+    const soundFontDir = `https://soundfonts.pages.dev/${name}`;
     await player.loadSoundFontDir(ns, soundFontDir);
     await player.loadNoteSequence(ns);
   }
@@ -1111,6 +1121,41 @@ function initSeekbar(ns, seconds) {
   document.getElementById("currentTime").textContent = formatTime(seconds);
 }
 
+function loadSoundFontList() {
+  return fetch("https://soundfonts.pages.dev/list.json")
+    .then((response) => response.json())
+    .then((data) => {
+      const soundfonts = document.getElementById("soundfonts");
+      data.forEach((info) => {
+        const option = document.createElement("option");
+        option.textContent = info.name;
+        if (info.name == "GeneralUser_GS_v1.471") {
+          option.selected = true;
+        }
+        soundfonts.appendChild(option);
+      });
+    });
+}
+
+async function changeConfig() {
+  switch (player.getPlayState()) {
+    case "started": {
+      player.stop();
+      await loadSoundFont();
+      const speed = parseInt(document.getElementById("speed").value);
+      setSpeed(ns, speed);
+      const seconds = parseInt(document.getElementById("seekbar").value);
+      initSeekbar(ns, seconds);
+      setLoadingTimer(seconds);
+      player.start(ns);
+      break;
+    }
+    case "paused":
+      configChanged = true;
+      break;
+  }
+}
+
 function resize() {
   const parentElement = visualizer.parentElement;
   const rectHeight = parentElement.getBoundingClientRect().height;
@@ -1366,6 +1411,7 @@ let instrumentStates;
 let tapCount = 0;
 let perfectCount = 0;
 let greatCount = 0;
+let firstRun = true;
 loadConfig();
 if (location.search) {
   loadMIDIFromUrlParams();
@@ -1373,6 +1419,7 @@ if (location.search) {
   const query = initQuery();
   loadMIDIFromUrl("abt.mid", query);
 }
+loadSoundFontList();
 
 const scoreModal = new bootstrap.Modal("#scorePanel", {
   backdrop: "static",
@@ -1385,10 +1432,6 @@ document.ondragover = (e) => {
   e.preventDefault();
 };
 document.ondrop = dropFileEvent;
-document.getElementById("inputMIDIFile").onchange = loadMIDIFileEvent;
-document.getElementById("inputMIDIUrl").onchange = loadMIDIUrlEvent;
-document.getElementById("inputSoundFontFile").onchange = loadSoundFontFileEvent;
-document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
 document.getElementById("play").onclick = play;
 document.getElementById("pause").onclick = pause;
 document.getElementById("speed").onchange = changeSpeedEvent;
@@ -1398,6 +1441,11 @@ document.getElementById("repeat").onclick = repeat;
 document.getElementById("volumeOnOff").onclick = volumeOnOff;
 document.getElementById("volumebar").onchange = changeVolumebar;
 document.getElementById("seekbar").onchange = changeSeekbar;
+document.getElementById("inputMIDIFile").onchange = loadMIDIFileEvent;
+document.getElementById("inputMIDIUrl").onchange = loadMIDIUrlEvent;
+document.getElementById("inputSoundFontFile").onchange = loadSoundFontFileEvent;
+document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
+document.getElementById("soundfonts").onchange = changeConfig;
 document.getElementById("courseOption").onchange = changeButtons;
 window.addEventListener("resize", resize);
 document.addEventListener("click", unlockAudio, {
