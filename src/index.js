@@ -789,7 +789,7 @@ async function initPlayer() {
   player = new SoundFontPlayer(stopCallback);
   if (firstRun) {
     firstRun = false;
-    await loadSoundFont("GeneralUser_GS_v1");
+    await loadSoundFont("GeneralUser_GS_v1.471");
   } else {
     await loadSoundFont();
   }
