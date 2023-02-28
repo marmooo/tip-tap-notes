@@ -603,6 +603,7 @@ class SoundFontPlayer {
   async loadSoundFontDir(ns, dir) {
     const programs = new Set();
     ns.notes.forEach((note) => programs.add(note.program));
+    if (ns.notes.some((note) => note.isDrum)) programs.add(128);
     const promises = [...programs].map((program) => {
       const programId = program.toString().padStart(3, "0");
       const url = `${dir}/${programId}.sf3`;
