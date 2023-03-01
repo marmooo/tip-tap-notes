@@ -635,9 +635,7 @@ class SoundFontPlayer {
   }
 
   async loadSoundFontBuffer(soundFontBuffer) {
-    if (this.synth) {
-      await this.synth.unloadSFontAsync(this.soundFontId);
-    } else {
+    if (!this.synth) {
       await this.context.audioWorklet.addModule(
         "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
       );
