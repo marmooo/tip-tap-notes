@@ -799,7 +799,7 @@ async function initPlayer() {
 async function loadSoundFont(name) {
   if (player instanceof SoundFontPlayer) {
     if (!name) {
-      const soundfonts = document.getElementById("soundfonts")
+      const soundfonts = document.getElementById("soundfonts");
       name = soundfonts.options[soundfonts.selectedIndex].value;
     }
     const soundFontDir = `https://soundfonts.pages.dev/${name}`;
@@ -1360,13 +1360,7 @@ function scoring() {
   const tapped = perfectCount * 2 + greatCount;
   const speed = parseInt(document.getElementById("speed").value);
   const course = document.getElementById("courseOption").selectedIndex;
-  const programs = Array.from(programStates.values())
-    .filter((state) => state).length;
-  const instruments = Array.from(instrumentStates.values())
-    .filter((state) => state).length;
-  const score = parseInt(
-    tapped * speed * programs * instruments * course * accuracy,
-  );
+  const score = parseInt(tapped * speed * course * accuracy);
   document.getElementById("perfectCount").textContent = perfectCount;
   document.getElementById("greatCount").textContent = greatCount;
   document.getElementById("missCount").textContent = missCount;
