@@ -800,7 +800,9 @@ async function loadSoundFont(name) {
   if (player instanceof SoundFontPlayer) {
     if (!name) {
       const soundfonts = document.getElementById("soundfonts");
-      name = soundfonts.options[soundfonts.selectedIndex].value;
+      const index = soundfonts.selectedIndex;
+      if (index == 0) return; // use local file or url
+      name = soundfonts.options[index].value;
     }
     const soundFontDir = `https://soundfonts.pages.dev/${name}`;
     await player.loadSoundFontDir(ns, soundFontDir);
