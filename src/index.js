@@ -562,12 +562,11 @@ class MagentaPlayer extends core.SoundFontPlayer {
   }
 
   restart(seconds) {
-    if (seconds) super.start(ns, undefined, seconds / ns.ticksPerQuarter);
-    return this.start(this.ns);
-  }
-
-  stop(callStop) {
-    if (!callStop) super.stop();
+    if (seconds) {
+      return super.start(ns, undefined, seconds / ns.ticksPerQuarter);
+    } else {
+      return this.start(this.ns);
+    }
   }
 
   resume(seconds) {
@@ -598,6 +597,7 @@ class SoundFontPlayer {
     this.stopCallback = stopCallback;
     this.prevGain = 0.5;
     this.cacheUrls = new Array(128);
+    this.totalTicks = 0;
   }
 
   async loadSoundFontDir(ns, dir) {
@@ -655,6 +655,7 @@ class SoundFontPlayer {
     await this.synth.resetPlayer();
     this.ns = ns;
     const midiBuffer = core.sequenceProtoToMidi(ns);
+    this.totalTicks = this.calcTick(ns.totalTime);
     return player.synth.addSMFDataToPlayer(midiBuffer);
   }
 
@@ -668,9 +669,11 @@ class SoundFontPlayer {
     this.seekTo(seconds);
     await this.synth.waitForPlayerStopped();
     await this.synth.waitForVoicesStopped();
-    if (this.callStop) {
+    this.state = "paused";
+    const currentTick = await this.synth.retrievePlayerCurrentTick();
+    if (this.totalTicks <= currentTick) {
+      player.seekTo(0);
       this.stopCallback();
-      this.callStop = false;
     }
   }
 
@@ -680,16 +683,9 @@ class SoundFontPlayer {
     this.restart();
   }
 
-  stop(callStop) {
+  stop() {
     if (this.isPlaying()) {
-      this.state = "stopped";
-      this.callStop = callStop;
       this.synth.stopPlayer();
-      this.seekTo(0);
-    } else if (callStop) {
-      this.callStop = callStop;
-      this.seekTo(0);
-      this.stopCallback();
     }
   }
 
@@ -730,14 +726,14 @@ class SoundFontPlayer {
       } else {
         const t = seconds - prevTime;
         tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
-        return tick;
+        return Math.round(tick);
       }
       prevTime = currTime;
       prevQpm = currQpm;
     }
     const t = seconds - prevTime;
     tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
-    return tick;
+    return Math.round(tick);
   }
 
   seekTo(seconds) {
@@ -758,14 +754,14 @@ class SoundFontPlayer {
 }
 
 function stopCallback() {
+  clearInterval(timer);
+  currentTime = 0;
+  initSeekbar(ns, 0);
+  visualizer.parentElement.scrollTop = visualizer.parentElement.scrollHeight;
   clearPlayer();
   const repeatObj = document.getElementById("repeat");
   const repeat = repeatObj.classList.contains("active");
-  if (repeat) {
-    initSeekbar(ns, 0);
-    setLoadingTimer(0);
-    player.restart();
-  }
+  if (repeat) play();
   scoring();
   scoreModal.show();
   [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
@@ -775,7 +771,7 @@ function stopCallback() {
 
 async function initPlayer() {
   disableController();
-  if (player && player.isPlaying()) stop();
+  if (player && player.isPlaying()) player.stop();
   currentTime = 0;
   initSeekbar(ns, 0);
 
@@ -825,11 +821,7 @@ function setTimer(seconds) {
       const rate = 1 - currentTime / totalTime;
       visualizer.parentElement.scrollTop = currentScrollHeight * rate;
     } else {
-      stop(true);
       clearInterval(timer);
-      currentTime = 0;
-      visualizer.parentElement.scrollTop =
-        visualizer.parentElement.scrollHeight;
     }
   }, delay);
 }
@@ -874,11 +866,12 @@ function play() {
   document.getElementById("play").classList.add("d-none");
   document.getElementById("pause").classList.remove("d-none");
   switch (player.getPlayState()) {
-    case "started":
     case "stopped":
+      initSeekbar(ns, currentTime);
       setLoadingTimer(currentTime);
       player.restart();
       break;
+    case "started":
     case "paused":
       player.resume(currentTime);
       setTimer(currentTime);
@@ -893,12 +886,6 @@ function play() {
 
 function pause() {
   player.pause();
-  clearPlayer();
-}
-
-function stop(callStop) {
-  document.getElementById("currentTime").textContent = formatTime(0);
-  player.stop(callStop);
   clearPlayer();
 }
 
