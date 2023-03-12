@@ -1215,21 +1215,31 @@ function typeEventKey(key) {
   if (pos != -1) keyEvents[pos]();
 }
 
-function searchNotePosition(notes, time) {
+function searchNotePosition(notes, time, recursive) {
   let left = 0;
   let right = notes.length - 1;
   let mid;
+  if (time < notes[0].startTime) return -1;
   while (left <= right) {
     mid = Math.floor((left + right) / 2);
-    if (notes[mid].startTime > time) {
-      right = mid - 1;
+    if (notes[mid].startTime === time) {
+      const t = notes[mid].startTime - 1e-8;
+      if (t < notes[0].startTime) {
+        return 0;
+      } else {
+        return searchNotePosition(notes, t, true);
+      }
     } else if (notes[mid].startTime < time) {
       left = mid + 1;
     } else {
-      return mid;
+      right = mid - 1;
     }
   }
-  return mid;
+  if (recursive) {
+    return right + 1;
+  } else {
+    return searchNotePosition(notes, notes[right].startTime, true);
+  }
 }
 
 function buttonEvent(state, x, svgHeight) {
@@ -1239,7 +1249,8 @@ function buttonEvent(state, x, svgHeight) {
   let stateText = "MISS";
   const looseTime = 1;
   const startTime = currentTime - longestDuration - looseTime;
-  const startPos = searchNotePosition(ns.notes, startTime);
+  let startPos = searchNotePosition(ns.notes, startTime);
+  if (startPos < 0) startPos = 0;
   const endTime = currentTime + looseTime;
   const endPos = searchNotePosition(ns.notes, endTime) + 1;
   [...visualizer.svg.children].slice(startPos, endPos)
