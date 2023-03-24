@@ -1208,7 +1208,7 @@ function searchNotePosition(notes, time) {
   return right;
 }
 
-function buttonEvent(state, button) {
+function buttonEvent(state, buttonPos) {
   tapCount += 1;
   const t = currentTime;
   const looseTime = 0.1;
@@ -1220,7 +1220,7 @@ function buttonEvent(state, button) {
   for (let i = startPos; i <= endPos; i++) {
     const note = ns.notes[i];
     if (!note.target) continue;
-    if (note.button != button) continue;
+    if (note.button != buttonPos) continue;
     const rect = visualizer.svg.children[i];
     if (rect.classList.contains("fade")) continue;
     indexes.push(i);
@@ -1262,9 +1262,9 @@ function buttonEvent(state, button) {
   }, 200);
 }
 
-function setButtonEvent(state, button) {
+function setButtonEvent(state, button, buttonPos) {
   const ev = () => {
-    buttonEvent(state, button);
+    buttonEvent(state, buttonPos);
   };
   if ("ontouchstart" in window) {
     button.ontouchstart = ev;
@@ -1291,7 +1291,7 @@ function changeButtons() {
     button.className = "w-100 btn btn-light btn-tap";
     button.role = "button";
     button.textContent = (course > 10) ? texts[i] : texts[i * 2];
-    setButtonEvent(state, i);
+    setButtonEvent(state, button, i);
     div.appendChild(button);
     div.appendChild(state);
     playPanel.appendChild(div);
