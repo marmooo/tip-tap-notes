@@ -858,7 +858,10 @@ function enableController() {
 }
 
 function unlockAudio() {
+  if (!player) return;
+  if (!player.synth) return;
   player.resumeContext();
+  document.removeEventListener("click", unlockAudio);
 }
 
 function play() {
@@ -1398,7 +1401,4 @@ document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
 document.getElementById("soundfonts").onchange = changeConfig;
 document.getElementById("courseOption").onchange = changeButtons;
 window.addEventListener("resize", resize);
-document.addEventListener("click", unlockAudio, {
-  once: true,
-  useCapture: true,
-});
+document.addEventListener("click", unlockAudio);
