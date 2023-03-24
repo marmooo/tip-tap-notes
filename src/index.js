@@ -1212,10 +1212,11 @@ function buttonEvent(state, buttonPos) {
   tapCount += 1;
   const t = currentTime;
   const looseTime = 0.1;
-  const startTime = currentTime - longestDuration - looseTime;
+  const startTime = t - longestDuration - looseTime;
+  const endTime = t + looseTime;
   let startPos = searchNotePosition(ns.notes, startTime);
   if (startPos < 0) startPos = 0;
-  const endPos = searchNotePosition(ns.notes, t);
+  const endPos = searchNotePosition(ns.notes, endTime);
   const indexes = [];
   for (let i = startPos; i <= endPos; i++) {
     const note = ns.notes[i];
