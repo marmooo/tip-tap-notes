@@ -1309,22 +1309,17 @@ function changeButtons() {
   }
 }
 
-function countNotes() {
-  return ns.notes.filter((note) => note.target).length;
-}
-
 function getAccuracy() {
   if (tapCount == 0) return 0;
   return (perfectCount + greatCount) / tapCount;
 }
 
 function scoring() {
-  const totalCount = countNotes();
   const accuracy = getAccuracy();
-  const missCount = totalCount - perfectCount - greatCount;
-  const perfectRate = Math.ceil(perfectCount / totalCount * 10000) / 100;
-  const greatRate = Math.ceil(greatCount / totalCount * 10000) / 100;
-  const missRate = Math.ceil(missCount / totalCount * 10000) / 100;
+  const missCount = tapCount - perfectCount - greatCount;
+  const perfectRate = Math.ceil(perfectCount / tapCount * 10000) / 100;
+  const greatRate = Math.ceil(greatCount / tapCount * 10000) / 100;
+  const missRate = Math.ceil(missCount / tapCount * 10000) / 100;
   const tapped = perfectCount * 2 + greatCount;
   const speed = parseInt(document.getElementById("speed").value);
   const course = document.getElementById("courseOption").selectedIndex;
