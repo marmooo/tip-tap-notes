@@ -1,4 +1,4 @@
-var CACHE_NAME = "2023-04-16 16:50";
+var CACHE_NAME = "2023-04-26 00:00";
 var urlsToCache = [
   "/tip-tap-notes/",
   "/tip-tap-notes/index.js",
@@ -6,7 +6,10 @@ var urlsToCache = [
   "/tip-tap-notes/favicon/favicon.svg",
   "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css",
   "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js",
-  "https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.1/es6/core.js,npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js,npm/js-synthesizer@1.8.5/dist/js-synthesizer.min.js",
+  "https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.1/es6/core.js",
+  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.min.js",
+  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.worklet.min.js",
+  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
 ];
 
 self.addEventListener("install", function (event) {
