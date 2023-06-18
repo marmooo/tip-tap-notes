@@ -135,7 +135,24 @@
       </div>
       <div class="row text-center">
         <h6>Filter Instruments</h6>
-        <div id="filterInstruments"></div>
+        <div id="filterInstruments">
+          <div class="form-check form-check-inline">
+            <label class="form-check-label">
+              <input class="form-check-input" name="instrument" value="0:0" type="checkbox" checked="">
+              0:0
+            </label>
+          </div><div class="form-check form-check-inline">
+            <label class="form-check-label">
+              <input class="form-check-input" name="instrument" value="0:1" type="checkbox" checked="">
+              0:1
+            </label>
+          </div><div class="form-check form-check-inline">
+            <label class="form-check-label">
+              <input class="form-check-input" name="instrument" value="0:2" type="checkbox" checked="">
+              0:2
+            </label>
+          </div>
+        </div>
       </div>
       <div class="pt-3">
         <div id="midiTitle" class="text-center"></div>
@@ -147,7 +164,14 @@
       </div>
       <div id="gamePanel" class="pt-3 d-flex flex-column"></div>
       <hr class="m-0">
-      <div id="playPanel" class="d-flex text-center"></div>
+      <div id="playPanel" class="d-flex text-center">
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">A</button><span class="badge">MISS</span></div>
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">S</button><span class="badge">MISS</span></div>
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">D</button><span class="badge">MISS</span></div>
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">F</button><span class="badge">MISS</span></div>
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">G</button><span class="badge">MISS</span></div>
+        <div class="w-100"><button class="w-100 btn btn-light btn-tap" role="button">H</button><span class="badge">MISS</span></div>
+      </div>
       <div id="scorePanel" class="modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
@@ -221,6 +245,14 @@
       </div>
       <div class="text-muted">&copy; <a href="https://github.com/marmooo">marmooo</a></div>
     </footer>
+    <div class="drop-inline-css
+      modal modal-static
+      modal-backdrop fade show
+      offcanvas-backdrop fade show
+      offcanvas showing hiding
+      bg-primary bg-success bg-danger
+      d-none" data-bs-backdrop="false" data-bs-scroll="true">
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.1/es6/core.js"></script>
     <script src="index.js"></script>
