@@ -664,8 +664,8 @@ class SoundFontPlayer {
 
   async restart(seconds) {
     this.state = "started";
-    if (seconds) await this.synth.playPlayer();
-    this.seekTo(seconds);
+    await this.synth.playPlayer();
+    if (seconds) this.seekTo(seconds);
     await this.synth.waitForPlayerStopped();
     await this.synth.waitForVoicesStopped();
     this.state = "paused";
