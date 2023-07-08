@@ -1153,15 +1153,15 @@ function changeVisualizerPositions(visualizer) {
   const svgWidth = parseFloat(viewBox[2]);
   const widthStep = svgWidth / course;
   const rects = visualizer.svg.children;
-  ns.notes
-    .filter((note) => note.target)
-    .forEach((note, i) => {
+  ns.notes.forEach((note, i) => {
+    if (note.target) {
       const rect = rects[i];
       const n = Math.floor((note.pitch - minPitch) / courseStep);
       note.button = n;
       rect.setAttribute("x", Math.ceil(n * widthStep));
       rect.setAttribute("width", widthStep);
-    });
+    }
+  });
 }
 
 function typeEvent(event) {
