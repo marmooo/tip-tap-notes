@@ -1,16 +1,16 @@
 function loadConfig() {
   if (localStorage.getItem("darkMode") == 1) {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.setAttribute("data-bs-theme", "dark");
   }
 }
 
 function toggleDarkMode() {
   if (localStorage.getItem("darkMode") == 1) {
     localStorage.setItem("darkMode", 0);
-    delete document.documentElement.dataset.theme;
+    document.documentElement.setAttribute("data-bs-theme", "light");
   } else {
     localStorage.setItem("darkMode", 1);
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.setAttribute("data-bs-theme", "dark");
   }
 }
 
@@ -1265,7 +1265,7 @@ function buttonEvent(state, buttonPos) {
   }
   setTimeout(() => {
     state.textContent = "MISS";
-    state.className = "badge";
+    state.className = "badge opacity-0";
   }, 200);
 }
 
@@ -1292,7 +1292,7 @@ function changeButtons() {
     const div = document.createElement("div");
     div.className = "w-100";
     const state = document.createElement("span");
-    state.className = "badge";
+    state.className = "badge opacity-0";
     state.textContent = "MISS";
     const button = document.createElement("button");
     button.className = "w-100 btn btn-light btn-tap";
