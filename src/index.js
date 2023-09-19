@@ -594,7 +594,7 @@ class SoundFontPlayer {
   constructor(stopCallback) {
     this.context = new AudioContext();
     this.state = "stopped";
-    this.callStop = false;
+    this.noCallback = false;
     this.stopCallback = stopCallback;
     this.prevGain = 0.5;
     this.cacheUrls = new Array(128);
@@ -669,8 +669,9 @@ class SoundFontPlayer {
     await this.synth.waitForPlayerStopped();
     await this.synth.waitForVoicesStopped();
     this.state = "paused";
-    const currentTick = await this.synth.retrievePlayerCurrentTick();
-    if (this.totalTicks <= currentTick) {
+    if (this.noCallback) {
+      this.noCallback = false;
+    } else {
       player.seekTo(0);
       this.stopCallback();
     }
@@ -682,7 +683,8 @@ class SoundFontPlayer {
     this.restart();
   }
 
-  stop() {
+  stop(noCallback) {
+    if (noCallback) this.noCallback = true;
     if (this.isPlaying()) {
       this.synth.stopPlayer();
     }
@@ -970,7 +972,7 @@ async function changeSpeed(speed) {
   perfectCount = greatCount = 0;
   if (!ns) return;
   const playState = player.getPlayState();
-  player.stop();
+  player.stop(true);
   clearInterval(timer);
   const prevRate = nsCache.totalTime / ns.totalTime;
   const rate = prevRate / (speed / 100);
@@ -1101,7 +1103,7 @@ function loadSoundFontList() {
 async function changeConfig() {
   switch (player.getPlayState()) {
     case "started": {
-      player.stop();
+      player.stop(true);
       if (player instanceof SoundFontPlayer) {
         await loadSoundFont(player);
       }
