@@ -895,7 +895,7 @@ function play() {
       enableController();
       break;
   }
-  window.scrollTo({
+  globalThis.scrollTo({
     top: document.getElementById("playPanel").getBoundingClientRect().top,
     behavior: "auto",
   });
@@ -1279,14 +1279,9 @@ function buttonEvent(state, buttonPos) {
 }
 
 function setButtonEvent(state, button, buttonPos) {
-  const ev = () => {
-    buttonEvent(state, buttonPos);
-  };
-  if ("ontouchstart" in window) {
-    button.ontouchstart = ev;
-  } else {
-    button.onclick = ev;
-  }
+  const ev = () => buttonEvent(state, buttonPos);
+  button.ontouchstart = ev;
+  button.onclick = ev;
   keyEvents.push(ev);
 }
 
@@ -1412,8 +1407,8 @@ const JSSynthPromise = loadLibraries([
 
 document.getElementById("toggleDarkMode").onclick = toggleDarkMode;
 document.getElementById("toggleColor").onclick = toggleRectColor;
-document.ondragover = (e) => {
-  e.preventDefault();
+document.ondragover = (event) => {
+  event.preventDefault();
 };
 document.ondrop = dropFileEvent;
 document.getElementById("play").onclick = play;
@@ -1431,5 +1426,5 @@ document.getElementById("inputSoundFontFile").onchange = loadSoundFontFileEvent;
 document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
 document.getElementById("soundfonts").onchange = changeConfig;
 document.getElementById("courseOption").onchange = changeButtons;
-window.addEventListener("resize", resize);
+globalThis.addEventListener("resize", resize);
 document.addEventListener("click", unlockAudio);
