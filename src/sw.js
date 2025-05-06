@@ -1,10 +1,10 @@
-const CACHE_NAME = "2025-04-06 01:35";
+const CACHE_NAME = "2025-05-06 12:35";
 const urlsToCache = [
   "/tip-tap-notes/",
   "/tip-tap-notes/index.js",
   "/tip-tap-notes/abt.mid",
   "/tip-tap-notes/favicon/favicon.svg",
-  "https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js",
+  "https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js",
   "https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.1/es6/core.js",
   "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.min.js",
   "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.worklet.min.js",
