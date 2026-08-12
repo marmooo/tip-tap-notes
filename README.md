@@ -1,7 +1,8 @@
 # tip-tap-notes
 
-Tap notes! A waterfall style MIDI notes tap game. It is suitable for classical
-music with few instruments.
+A browser rhythm game that automatically generates charts just by loading music
+files (MP3/WAV/OGG, etc.). Supports hold notes. You can also play MIDI files
+directly and change the sound source using SoundFonts (SF2/SF3).
 
 ## Build
 
