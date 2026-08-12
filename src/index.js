@@ -318,7 +318,7 @@ function buildWorkerOptions() {
     judgeOffset: (config.judgeOffset ?? 0) / 1000,
     startDelay: mode === "midi" ? START_DELAY_MIDI : 0,
     laneOpacity: config.laneOpacity ?? 0.35,
-    buttonZoneHeight: Math.max(60, Math.round(h * 0.12)),
+    buttonZoneHeight: Math.round(h * 0.2),
     perspective: (config.perspectiveEnabled ?? true) ? PERSPECTIVE : 0,
     uiColor: computeUiColor(),
     judgeLineColor: config.judgeLineColor || "",
