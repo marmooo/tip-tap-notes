@@ -874,6 +874,8 @@ function readSettingsUI() {
 
 function openSettings() {
   configSnapshot = { ...config, laneColors: [...config.laneColors] };
+  // 前回の未確定プレビューが残らないようにする
+  pendingBackground = null;
 
   const sv = (id, v) => {
     const el = document.getElementById(id);
@@ -953,6 +955,8 @@ function onSettingsInput() {
 
 function applySettings() {
   applyConfigToGame(readSettingsUI());
+  // 背景はプレビューのみ即時反映しているため、ここで初めて永続化する
+  commitPendingBackground();
   saveConfig(config);
   configSnapshot = null; // 適用済みなので hide.bs.modal 側の巻き戻しを無効化
   settingsModal.hide();
@@ -966,6 +970,9 @@ screenSettings.addEventListener("hide.bs.modal", () => {
   if (configSnapshot) {
     applyConfigToGame(configSnapshot);
     saveConfig(configSnapshot);
+    // 背景プレビューもスナップショット時点の表示へ戻す（config 文字列だけでなく
+    // 実際の画像/動画と <select> の選択状態も巻き戻す）
+    revertPendingBackground(configSnapshot.backgroundPreset ?? "");
     configSnapshot = null;
   }
 });
@@ -1508,10 +1515,6 @@ midy.addEventListener("started", startGameMidi);
 midy.addEventListener("paused", () => {
   if (mode !== "midi") return;
   stopRaf();
-  // resumeTime ではなく、この瞬間まで安定して動いていた currentGameTime() を
-  // 使う（resumeTime は resume 直後と同種の不安定さを持つらしく、これを
-  // 使うと pause 直後の最後の描画・resume直後の近似値の両方がズレて、
-  // ノーツが一瞬消えたように見えることがあった）。
   _pausedAt = currentGameTime();
   worker?.postMessage({ type: "tick", currentTime: _pausedAt });
   if (gamePhase === "playing") {
@@ -1892,45 +1895,149 @@ async function clearBackgroundFile() {
   });
 }
 
-document.getElementById("backgroundPreset")?.addEventListener("change", (e) => {
-  const v = e.currentTarget.value;
-  if (v === "custom") {
-    document.getElementById("backgroundFile").click();
-    return; // 実際の保存・反映は backgroundFile の change 側で行う
+// 設定モーダル中の背景変更はプレビューのみ。適用ボタンで初めて永続化し、
+// キャンセル（hide.bs.modal + configSnapshot あり）では表示も config も元に戻す。
+// pendingBackground: null = 未変更 / { preset: string, file?: File }
+// （preset は "" | "custom" | プリセットURL）
+let pendingBackground = null;
+let pendingBackgroundObjectUrl = null;
+
+function revokePendingBackgroundObjectUrl() {
+  if (pendingBackgroundObjectUrl) {
+    URL.revokeObjectURL(pendingBackgroundObjectUrl);
+    pendingBackgroundObjectUrl = null;
   }
-  config.backgroundPreset = v;
-  saveConfig(config);
-  if (!v) {
+}
+
+function setBackgroundSelectValue(preset) {
+  const presetEl = document.getElementById("backgroundPreset");
+  if (presetEl) presetEl.value = preset || "";
+}
+
+/** 表示だけ更新する（config / IndexedDB は触らない） */
+function previewBackground(preset, file = null) {
+  setBackgroundSelectValue(preset);
+  revokePendingBackgroundObjectUrl();
+  if (!preset) {
     hideBackground();
+    return;
+  }
+  if (preset === "custom") {
+    if (file) {
+      pendingBackgroundObjectUrl = URL.createObjectURL(file);
+      file.type.startsWith("video/")
+        ? showVideoBackground(pendingBackgroundObjectUrl)
+        : showImageBackground(pendingBackgroundObjectUrl);
+    } else {
+      // 保存済みカスタムを表示（キャンセルで元の custom に戻すとき等）
+      loadBackgroundFile()
+        .then((blob) => {
+          if (!blob) {
+            hideBackground();
+            return;
+          }
+          pendingBackgroundObjectUrl = URL.createObjectURL(blob);
+          blob.type.startsWith("video/")
+            ? showVideoBackground(pendingBackgroundObjectUrl)
+            : showImageBackground(pendingBackgroundObjectUrl);
+        })
+        .catch((err) => {
+          console.error("背景ファイルの復元に失敗:", err);
+          hideBackground();
+        });
+    }
+    return;
+  }
+  loadBackgroundUrl(preset);
+}
+
+/** 適用時: pending を config + IndexedDB に書き込む */
+function commitPendingBackground() {
+  if (!pendingBackground) return;
+  const { preset, file } = pendingBackground;
+  config.backgroundPreset = preset;
+  if (preset === "custom" && file) {
+    saveBackgroundFile(file).catch((err) =>
+      console.error("背景ファイルの保存に失敗:", err)
+    );
+  } else if (!preset) {
     clearBackgroundFile().catch((err) =>
       console.error("背景ファイルの削除に失敗:", err)
     );
-  } else {
-    loadBackgroundUrl(v);
   }
+  // プリセットURLへ切り替えた場合は IndexedDB の custom をクリアして容量を戻す
+  if (preset && preset !== "custom") {
+    clearBackgroundFile().catch((err) =>
+      console.error("背景ファイルの削除に失敗:", err)
+    );
+  }
+  pendingBackground = null;
+  // object URL は表示中に使っているので revoke しない（ページ離脱時に破棄される）
+  pendingBackgroundObjectUrl = null;
+}
+
+/** キャンセル時: スナップショットの preset 表示へ戻し、pending を破棄 */
+function revertPendingBackground(snapshotPreset) {
+  pendingBackground = null;
+  // file input も空にして、次回同じファイルを選べるようにする
+  const fileEl = document.getElementById("backgroundFile");
+  if (fileEl) fileEl.value = "";
+  previewBackground(snapshotPreset ?? "");
+}
+
+document.getElementById("backgroundPreset")?.addEventListener("change", (e) => {
+  const v = e.currentTarget.value;
+  if (v === "custom") {
+    // ファイル選択ダイアログへ。確定は backgroundFile の change、
+    // ダイアログキャンセル時は select を pending / config の値に戻す。
+    document.getElementById("backgroundFile").click();
+    // ダイアログをキャンセルすると change が来ないため、select が "custom" のまま
+    // 残るのを防ぐ。既に pending で custom を選んでいればそのまま、
+    // そうでなければ直前の確定値（または pending の preset）に戻す。
+    const fallback = pendingBackground?.preset ?? config.backgroundPreset ?? "";
+    if (fallback !== "custom") {
+      // ファイル選択の結果を待ってから、選ばれなかった場合だけ戻す。
+      // （change が発火すれば pending が custom になる。発火しなければ戻す）
+      const onFocusBack = () => {
+        globalThis.removeEventListener("focus", onFocusBack);
+        setTimeout(() => {
+          if (pendingBackground?.preset !== "custom") {
+            setBackgroundSelectValue(
+              pendingBackground?.preset ?? config.backgroundPreset ?? "",
+            );
+          }
+        }, 300);
+      };
+      globalThis.addEventListener("focus", onFocusBack);
+    }
+    return;
+  }
+  pendingBackground = { preset: v };
+  previewBackground(v);
 });
 document.getElementById("backgroundFile")?.addEventListener(
   "change",
-  async (e) => {
+  (e) => {
     const f = e.target.files[0];
-    if (!f) return;
-    const url = URL.createObjectURL(f);
-    f.type.startsWith("video/") ? showVideoBackground(url) : showImageBg(url);
-    config.backgroundPreset = "custom";
-    saveConfig(config);
-    try {
-      await saveBackgroundFile(f);
-    } catch (err) {
-      console.error("背景ファイルの保存に失敗:", err);
+    if (!f) {
+      // ファイル未選択（キャンセル相当）→ select を元に戻す
+      setBackgroundSelectValue(
+        pendingBackground?.preset ?? config.backgroundPreset ?? "",
+      );
+      return;
     }
+    pendingBackground = { preset: "custom", file: f };
+    previewBackground("custom", f);
   },
 );
 
 // ページ読み込み時、保存されている背景設定を復元してスタート画面にも反映する
 async function restoreBackground() {
   const v = config.backgroundPreset;
-  if (!v) return;
-  const presetEl = document.getElementById("backgroundPreset");
+  if (!v) {
+    setBackgroundSelectValue("");
+    return;
+  }
   if (v === "custom") {
     try {
       const blob = await loadBackgroundFile();
@@ -1938,15 +2045,15 @@ async function restoreBackground() {
         const url = URL.createObjectURL(blob);
         blob.type.startsWith("video/")
           ? showVideoBackground(url)
-          : showImageBg(url);
-        if (presetEl) presetEl.value = "custom";
+          : showImageBackground(url);
+        setBackgroundSelectValue("custom");
       }
     } catch (err) {
       console.error("背景ファイルの復元に失敗:", err);
     }
   } else {
     loadBackgroundUrl(v);
-    if (presetEl) presetEl.value = v;
+    setBackgroundSelectValue(v);
   }
 }
 
