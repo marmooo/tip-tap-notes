@@ -18,6 +18,7 @@ import {
   thinNotes,
 } from "./rhythm-game.js";
 import { MidiLibrary } from "https://marmooo.github.io/free-midi/midi-library.js";
+import { installIOSTouchGuards } from "/tip-tap-notes/ios-touch-guards.js";
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -2085,59 +2086,27 @@ showScreen("start");
 restoreBackground();
 setTimeout(setWrapHeight, 80);
 
-// ---------------------------------------------------------------------------
-// Prevent iOS events
-// ---------------------------------------------------------------------------
-
-function isIOSLike() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
-function installIOSTouchGuards() {
-  if (!isIOSLike()) return;
-
-  const opts = { passive: false, capture: true };
-
-  // ダブルタップズーム
-  document.addEventListener("dblclick", (e) => e.preventDefault(), opts);
-
-  // マルチタッチ（ピンチ等）と、プレイ中の余計なスクロール
-  const blockIfNeeded = (e) => {
-    // 入力欄は触らない
-    const t = e.target;
-    if (t.closest?.("input, textarea, select, [contenteditable]")) return;
-
-    // 2本以上 or ゲーム中はデフォルトを止める
-    if (e.touches?.length >= 2 || gamePhase === "playing") {
-      e.preventDefault();
-    }
-  };
-
-  document.addEventListener("touchstart", blockIfNeeded, opts);
-  document.addEventListener("touchmove", blockIfNeeded, opts);
-
-  // 古い gesture イベント（環境によってはまだ来る）
-  document.addEventListener("gesturestart", (e) => e.preventDefault(), opts);
-  document.addEventListener("gesturechange", (e) => e.preventDefault(), opts);
-  document.addEventListener("gestureend", (e) => e.preventDefault(), opts);
-
-  // 端スワイプでのヒストリ戻る/進む（iOS 13.4+ で効くことが多い）
-  document.addEventListener(
-    "touchstart",
-    (e) => {
-      if (e.touches.length !== 1) return;
-      const x = e.touches[0].clientX;
-      const edge = Math.min(24, globalThis.innerWidth * 0.08);
-      if (x < edge || x > globalThis.innerWidth - edge) {
-        e.preventDefault();
-      }
-    },
-    opts,
-  );
-}
-
-// 起動時に一度だけ
-installIOSTouchGuards();
+installIOSTouchGuards({
+  surfaceSelector: "#canvasWrap, #uiCanvas, canvas",
+  uiSelector: [
+    "#topnav",
+    ".navbar-brand",
+    "#btnPause",
+    "#pauseOverlay",
+    "#screenStart",
+    "#screenReady",
+    "#screenAnalyzing",
+    "#screenResult",
+    ".overlay",
+    ".modal",
+    ".modal-backdrop",
+    "button",
+    "a",
+    "input",
+    "select",
+    "textarea",
+    "label",
+  ].join(", "),
+  shouldBlockSurface: () => gamePhase === "playing",
+  styleElementId: "iosTouchGuardsStyle",
+});

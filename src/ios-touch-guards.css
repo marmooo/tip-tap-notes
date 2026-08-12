@@ -1,0 +1,64 @@
+/**
+ * iOS / iPadOS Safari 向けタッチジェスチャ抑制スタイル
+ *
+ * 読み込み例:
+ *   <link id="iosTouchGuardsStyle" rel="stylesheet" href="./ios-touch-guards.css">
+ *   または <style id="iosTouchGuardsStyle"> ... </style>
+ *
+ * on/off:
+ *   document.getElementById("iosTouchGuardsStyle").disabled = true;
+ *
+ * プロジェクトに合わせて「SURFACE」「UI」セレクタを書き換えて使う。
+ * JS (ios-touch-guards.js) の surfaceSelector / uiSelector と揃えること。
+ */
+
+/* ========== SURFACE: ゲーム面・キャンバス（強めに抑制） ========== */
+#canvasWrap,
+#noteCanvas,
+#particleCanvas,
+#uiCanvas,
+.gameLayer {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ========== UI: 操作を通す（SURFACE の none を上書き） ========== */
+#topnav,
+#topnav *,
+.navbar-brand,
+#btnPause,
+#btnPause *,
+#pauseOverlay,
+.overlay,
+.overlay button,
+.overlay a,
+.overlay .btn,
+.overlay input,
+.overlay select,
+.overlay label,
+.modal,
+.modal *,
+.modal-backdrop {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* フォームは選択・コールアウトを許可 */
+.modal input,
+.modal textarea,
+.modal select,
+#topnav select {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  touch-action: auto;
+}
+
+/* 端バウンス抑制（任意） */
+html,
+body {
+  overscroll-behavior: none;
+}
