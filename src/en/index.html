@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tip Tap Notes</title>
+    <meta name="description" content="A browser rhythm game that automatically generates charts just by loading music files (MP3/WAV/OGG, etc.). Supports hold notes. You can also play MIDI files directly and change the sound source using SoundFonts (SF2/SF3).">
+    <meta property="og:title" content="Tip Tap Notes">
+    <meta property="og:description" content="A browser rhythm game that automatically generates charts just by loading music files (MP3/WAV/OGG, etc.). Supports hold notes. You can also play MIDI files directly and change the sound source using SoundFonts (SF2/SF3).">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <script>
+      (function() {
+        const saved = localStorage.getItem("darkMode");
+        const prefersDark = globalThis.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (prefersDark ? "dark" : "light");
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      })();
+    </script>
+    <link rel="icon" type="image/png" href="/tip-tap-notes/favicon/favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/tip-tap-notes/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/tip-tap-notes/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/tip-tap-notes/favicon/site.webmanifest">
+    <link class="drop-inline-css" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <style>
+      body { min-height: 100vh; overflow-x: hidden; }
+
+      #libraryColumns {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .table-columns {
+        position: relative;
+      }
+      .table-columns summary {
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--bs-border-radius);
+        background: var(--bs-body-bg);
+      }
+      .table-columns summary::-webkit-details-marker {
+        display: none;
+      }
+      .table-columns summary::after {
+        content: " ▼";
+        font-size: 0.75em;
+      }
+      .table-columns[open]
+        summary::after {
+        content: " ▲";
+      }
+      .table-columns ul {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        min-width: 180px;
+        margin: 0;
+        padding: 8px;
+        list-style: none;
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--bs-border-radius);
+        background: var(--bs-body-bg);
+        box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+        z-index: 1000;
+      }
+      .table-columns li + li {
+        margin-top: 6px;
+      }
+      .table-columns-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+
+      /* Navbar logo: colorful with the same palette as falling notes.
+         Outline so it stays readable regardless of background (same idea as top-screen title). */
+      .brand-logo {
+        background: linear-gradient(90deg,
+          #f76707 0%, #f06595 30%, #9775fa 55%, #22b8cf 78%, #51cf66 100%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        -webkit-text-stroke: 0.4px rgba(0, 0, 0, 0.15);
+      }
+      html[data-bs-theme="dark"] .brand-logo {
+        -webkit-text-stroke: 0.4px rgba(0, 0, 0, 0.35);
+        filter: drop-shadow(0 0 10px rgba(151, 117, 250, 0.2));
+      }
+      @supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+        .brand-logo { color: var(--bs-warning); background: none; }
+      }
+
+      .gameLayer {
+        position: absolute; width: 100%; height: 100%;
+        pointer-events: none; touch-action: none;
+      }
+      #uiCanvas { pointer-events: auto; outline: none; }
+      #canvasWrap {
+        position: relative; overflow: hidden;
+        background-color: var(--bs-body-bg);
+        /* Always full viewport width: cancel parent .container-fluid.px-2 left/right padding
+           (0.5rem). Height is fixed to full screen (see setWrapHeight()).
+           #topnav is position:fixed and floats above the canvas only; it no longer
+           consumes layout height, so canvasWrap does not need to subtract it
+           (to gain a bit more play area on short devices like iPhone SE landscape). */
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        width: calc(100% + 1rem);
+      }
+
+      /* ===== TOP BAR: transparent nav floating above the canvas =====
+         position:fixed takes it out of layout so canvasWrap stays full-screen.
+         Background is bg-transparent (HTML class); here we only handle
+         position/z-index and click-through (gaps pass through to canvas;
+         logo and buttons receive clicks). */
+      #topnav {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      }
+      .backgroundLayer {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        object-fit: cover; object-position: center; pointer-events: none;
+      }
+
+      .overlay {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        /* High opacity and uniform full-screen so text stays readable
+           even when a background image/video is loaded (no center-only fade). */
+        background-color: rgba(var(--bs-body-bg-rgb), 0.8);
+        z-index: 10;
+      }
+      .overlay.hidden { display: none; }
+
+      /* ===== Start screen (top screen) hero effect =====
+         Preview the real game view (4 lanes, perspective, notes falling from above)
+         as the top-screen background so the player sees what is coming before reading.
+         Light mode: crisp high-contrast base styles (blur glow is almost invisible).
+         Dark mode (data-bs-theme="dark"): add glow effects on top. */
+      #screenStart { position: relative; isolation: isolate; }
+
+      /* Tip Tap Notes logo heading (h1). Same palette as navbar .brand-logo,
+         scaled up for the hero. */
+      .hero-logo {
+        margin: 0;
+        font-size: clamp(2rem, 7vw + 1rem, 4rem);
+        font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;
+      }
+      @supports (background-clip: text) or (-webkit-background-clip: text) {
+        .hero-logo {
+          background: linear-gradient(90deg,
+            #f76707 0%, #f06595 30%, #9775fa 55%, #22b8cf 78%, #51cf66 100%);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+          -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.18);
+          filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+        }
+      }
+      @supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+        .hero-logo { color: var(--bs-warning); }
+      }
+
+      @supports (background-clip: text) or (-webkit-background-clip: text) {
+        #screenStart .hero-title {
+          background: linear-gradient(120deg, #e8590c 0%, #f76707 45%, #d9480f 100%);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+          /* Thin stroke + short hard shadow so outline stays clear on any bg image/video. */
+          -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.18);
+          filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+        }
+      }
+
+      #startFeatureBadges .feature-chip {
+        display: inline-flex; align-items: center; gap: .4em;
+        padding: .4em .9em; border-radius: 999px;
+        font-size: .8rem; font-weight: 600;
+        color: var(--bs-body-color);
+        background: color-mix(in srgb, currentColor 5%, transparent);
+        border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      #selectPanel {
+        position: relative;
+        background: color-mix(in srgb, var(--bs-body-bg) 92%, transparent);
+        border: 1px solid color-mix(in srgb, var(--bs-warning) 45%, transparent) !important;
+        border-radius: 1rem !important;
+        box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.25);
+        transition: border-color 120ms ease, background-color 120ms ease,
+                    box-shadow 120ms ease;
+      }
+      #selectPanel.drag-active {
+        border-color: var(--bs-warning) !important;
+        background: color-mix(in srgb, var(--bs-warning) 8%, var(--bs-body-bg));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-warning) 18%, transparent);
+      }
+      #selectPanel.drag-active::after {
+        content: "Drop here";
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: inherit;
+        background: color-mix(in srgb, var(--bs-body-bg) 75%, transparent);
+        color: var(--bs-warning-text-emphasis);
+        font-weight: 600;
+        pointer-events: none;
+      }
+      #selectFile {
+        background: linear-gradient(135deg, #f76707, #d9480f);
+        border: none; color: #fff;
+        box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55);
+      }
+      #selectFile:hover, #selectFile:focus {
+        background: linear-gradient(135deg, #fd7e14, #d9480f);
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        #selectFile { animation: heroPulse 2.6s ease-in-out infinite; }
+      }
+      @keyframes heroPulse {
+        0%, 100% { box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55); }
+        50%      { box-shadow: 0 6px 20px 0px rgba(120, 53, 15, 0.7); }
+      }
+
+      /* ---- Dark mode: add glow / glass effects ---- */
+      html[data-bs-theme="dark"] .hero-logo {
+        -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.35);
+        filter: drop-shadow(0 2px 18px rgba(151, 117, 250, 0.25));
+      }
+      html[data-bs-theme="dark"] #screenStart .hero-title {
+        background: linear-gradient(120deg, #ffe066 0%, #ffb703 45%, #fb8500 100%);
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.35);
+        filter: drop-shadow(0 2px 16px rgba(251, 133, 0, 0.25));
+      }
+      html[data-bs-theme="dark"] #selectPanel {
+        background: color-mix(in srgb, var(--bs-body-bg) 55%, transparent);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 12px 40px -16px rgba(0, 0, 0, 0.45),
+                    0 0 0 1px color-mix(in srgb, var(--bs-warning) 8%, transparent) inset;
+      }
+      html[data-bs-theme="dark"] #selectFile {
+        background: linear-gradient(135deg, #ffb703, #fb8500);
+        box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65);
+        animation-name: heroPulseDark;
+      }
+      html[data-bs-theme="dark"] #selectFile:hover,
+      html[data-bs-theme="dark"] #selectFile:focus {
+        background: linear-gradient(135deg, #ffc93c, #fb8500);
+      }
+      @keyframes heroPulseDark {
+        0%, 100% { box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65); }
+        50%      { box-shadow: 0 6px 26px 2px rgba(251, 133, 0, 0.85); }
+      }
+
+      .lane-key-chip {
+        display: inline-block; width: 2.2em; height: 2.2em;
+        line-height: 2.2em; text-align: center; border-radius: 6px;
+        font-family: monospace; font-weight: bold; font-size: 1.05em;
+        border: 1px solid transparent;
+        margin: 2px;
+        /* --lane-color is set per lane by JS (renderKeyHints).
+           color / background mix currentColor (auto light/dark) with lane color
+           via color-mix so contrast stays consistent in both themes. */
+        --lane-color: currentColor;
+        background: color-mix(in srgb, var(--lane-color) 20%, transparent);
+        border-color: var(--lane-color);
+        color: color-mix(in srgb, var(--lane-color) 65%, currentColor 35%);
+      }
+
+      .grade-badge { font-size: 3.5rem; font-weight: 900; line-height: 1; }
+      .grade-S { color: #ffe066; text-shadow: 0 0 20px #ffe066; }
+      .grade-A { color: #66ffcc; text-shadow: 0 0 20px #66ffcc; }
+      .grade-B { color: #66ccff; text-shadow: 0 0 20px #66ccff; }
+      .grade-C { color: #ff9966; text-shadow: 0 0 20px #ff9966; }
+      .grade-D { color: #ff6666; text-shadow: 0 0 20px #ff6666; }
+
+      /* Generic hide class (used for MIDI player / audio transport switching) */
+      .hidden { display: none !important; }
+
+      /* Audio-mode hint (readyHintAudio): switchMode() sets html[data-mode];
+         show only when in audio mode. */
+      [data-hint-mode] { display: none; }
+      html[data-mode="audio"] [data-hint-mode="audio"] {
+        display: block;
+      }
+
+      .border-dashed { border-style: dashed !important; }
+
+      .lane-color-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+      .lane-color-grid label {
+        display: flex; flex-direction: column; align-items: center; gap: 2px; width: 40px;
+      }
+      .lane-color-grid input[type=color] {
+        width: 100%; height: 32px; padding: 2px; border-radius: 4px; cursor: pointer;
+      }
+
+      .lane-key-input { width: 2.4em; height: 2.4em; padding: 0; font-size: 1.1em; }
+
+      .lane-input-wrap {
+        display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+      }
+
+      #resultTable td { padding: 2px 14px; }
+      #resultTable .label { color: var(--bs-secondary-color); }
+
+      audio#player { width: 100%; height: 36px; }
+      #analyzingProgressWrap { width: 240px; }
+
+      /* MIDI / SoundFont library modals (Bootstrap modal) */
+      #libraryTable th, #libraryTable td {
+        padding: 4px 8px;
+        border-bottom: 1px solid var(--bs-border-color);
+        vertical-align: middle;
+      }
+      .midi-library-row-active { background-color: rgba(var(--bs-warning-rgb), 0.12); }
+    </style>
+
+    <!-- Styles dedicated to the top-screen “falling notes” effect.
+         Same perspective as the real game: trapezoid grows larger toward the front.
+         Colors/opacity are light-mode base; dark mode (data-bs-theme="dark") adds stronger glow. -->
+    <style id="heroFallingNotesStyle">
+      .hero-bg {
+        position: absolute; inset: 0; z-index: -1;
+        overflow: hidden; pointer-events: none;
+        /* Avoid a hard band mid-screen: no center mask; keep overall thin uniform opacity.
+           Soft fade only at top and bottom edges. */
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+      }
+      .hero-lanes {
+        position: absolute; left: 50%; bottom: -6%;
+        width: 100%; height: 150%;
+        transform: translateX(-50%) perspective(1800px) rotateX(50deg);
+        transform-origin: bottom center;
+        display: flex; gap: 3px;
+      }
+      .hero-lane {
+        flex: 1; position: relative;
+        border-left: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+      }
+      .hero-lane:last-child { border-right: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
+
+      /* Note body: just a rectangle of constant size moving top: -70% → 112% at fixed speed
+         (same as the real game: shared speed, no overtaking).
+         Looking smaller farther / larger nearer is purely from the parent .hero-lanes
+         perspective(1800px) rotateX(50deg) plane transform — not per-note scale or clip-path.
+         perspective was originally 500px, which put the vanishing point well below the top
+         of the screen so notes never appeared to emerge from the very top no matter how far
+         top was extended. Widening to 1800px pushes the vanishing point off the top of the
+         screen so top: -70% can be used as “appear near the top edge”
+         (rotateX was strengthened from 42° to 50° to restore trapezoid narrowing after
+         the vanishing point was pushed up; perspective also went 1400→1800px for headroom
+         on tall screens so the vanishing point stays off-screen).
+         --note-h (subtle length variation of tap notes) and --note-color are set per note
+         in HTML; CSS only consumes them. We do not vary trapezoid angle per lane
+         (overkill for a background effect). */
+      .hero-note {
+        position: absolute; top: -70%;
+        left: var(--note-l, 17%); right: var(--note-r, 17%);
+        height: var(--note-h, 11px);
+        border-radius: 1px;
+        background: color-mix(in srgb, var(--note-color, #f76707) 28%, transparent);
+      }
+      .hero-judgeline {
+        position: absolute; left: 6%; right: 6%; bottom: 21%; height: 2px;
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, #f76707 35%, transparent) 50%, transparent);
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .hero-note {
+          animation-name: heroFall;
+          animation-duration: 10s; /* shared by all notes = constant speed (slow fall) */
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+      }
+      @keyframes heroFall {
+        from { top: -70%; }
+        to   { top: 112%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hero-note { top: 45%; }
+      }
+
+      /* ---- Dark mode: mild glow (always behind text, so keep it moderate) ---- */
+      html[data-bs-theme="dark"] .hero-note {
+        background: color-mix(in srgb, var(--note-color, #fb8500) 25%, transparent);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--note-color, #fb8500) 30%, transparent);
+      }
+      html[data-bs-theme="dark"] .hero-judgeline {
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bs-warning) 55%, transparent) 50%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- TOP BAR -->
+    <nav id="topnav" class="navbar navbar-expand bg-transparent">
+      <div class="container-fluid px-3 gap-2">
+        <a class="navbar-brand mb-0 fw-bold brand-logo" href="/tip-tap-notes/">
+          <img alt="" src="/tip-tap-notes/favicon/favicon.svg" width="32" height="32">
+          Tip Tap Notes
+        </a>
+        <div class="d-flex gap-1 ms-auto align-items-center">
+          <select title="language" id="lang" class="form-select form-select-sm">
+            <option value="ja">日本語</option>
+            <option value="en" selected>English</option>
+          </select>
+          <button title="configuration" id="btnSettings"    class="fs-4 btn p-0">⚙</button>
+          <button title="toggle dark-mode" id="toggleDarkMode" class="fs-4 btn p-0">🌓</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid px-2">
+
+      <!-- Native <audio> for playback. GUI is hidden; used only as the internal playback engine
+           (controls are the large center button, top-left pause button, and Space key). -->
+      <audio id="player" preload="auto" hidden></audio>
+
+      <!-- Game canvas -->
+      <div id="canvasWrap">
+        <img id="backgroundImage" class="backgroundLayer" hidden>
+        <video id="backgroundVideo" class="backgroundLayer" hidden loop muted autoplay playsinline></video>
+        <canvas id="noteCanvas"     class="gameLayer"></canvas>
+        <canvas id="particleCanvas" class="gameLayer"></canvas>
+        <canvas id="uiCanvas"       class="gameLayer"></canvas>
+
+        <!-- Pause button top-left, symmetric with score (drawn on Canvas top-right).
+             Both MIDI and audio modes call togglePause() from this button
+             (MIDI mode uses midy.pause()/resume() internally).
+             #topnav is a transparent overlay on the same top-left corner, so without
+             offset the brand logo would steal the hit target.
+             Shift down by --topbar-h (set by setWrapHeight() in game.js).
+             SVG instead of emoji (⏸/▶) to avoid font/OS overflow or clipping on the
+             round button; fixed-size SVG. Actual swap is done by ICON_PAUSE / ICON_PLAY
+             via innerHTML in game.js. -->
+        <button id="btnPause" type="button" title="Space to pause/resume"
+                class="btn btn-sm btn-secondary rounded-circle hidden
+                       d-flex align-items-center justify-content-center"
+                style="position:absolute; top:calc(var(--topbar-h, 0px));
+                       left:10px; z-index:5;
+                       width:2.4rem; height:2.4rem; padding:0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+               viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+            <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
+          </svg>
+        </button>
+
+        <!-- Pause overlay (shown/hidden from btnPause only while playing) -->
+        <div id="pauseOverlay" class="hidden"
+             style="position:absolute; inset:0; z-index:4; display:flex;
+                    align-items:center; justify-content:center;
+                    background:rgba(0,0,0,0.45); pointer-events:none;">
+          <div class="fs-2 fw-bold text-white">Paused</div>
+        </div>
+
+        <!-- Start screen (title/description always fixed; no mode-based switching) -->
+        <div id="screenStart" class="overlay pt-5">
+          <div class="hero-bg" aria-hidden="true">
+            <div class="hero-lanes">
+              <div class="hero-lane">
+                <span class="hero-note" style="--note-h:14px; --note-color:#f76707; animation-delay:-0.3s;"></span>
+                <span class="hero-note" style="--note-h:16px; --note-color:#22b8cf; animation-delay:-2.9s;"></span>
+                <span class="hero-note" style="--note-h:19px; --note-color:#f06595; animation-delay:-6.1s;"></span>
+              </div>
+              <div class="hero-lane">
+                <span class="hero-note" style="--note-h:12px; --note-color:#9775fa; animation-delay:-1.1s;"></span>
+                <span class="hero-note" style="--note-h:27px; --note-color:#f76707; animation-delay:-3.9s;"></span>
+                <span class="hero-note" style="--note-h:21px; --note-color:#51cf66; animation-delay:-7.3s;"></span>
+              </div>
+              <div class="hero-lane">
+                <span class="hero-note" style="--note-h:24px; --note-color:#f06595; animation-delay:-1.6s;"></span>
+                <span class="hero-note" style="--note-h:15px; --note-color:#22b8cf; animation-delay:-4.4s;"></span>
+                <span class="hero-note" style="--note-h:22px; --note-color:#f76707; animation-delay:-8.2s;"></span>
+              </div>
+              <div class="hero-lane">
+                <span class="hero-note" style="--note-h:18px; --note-color:#51cf66; animation-delay:-2.5s;"></span>
+                <span class="hero-note" style="--note-h:13px; --note-color:#9775fa; animation-delay:-5.6s;"></span>
+                <span class="hero-note" style="--note-h:12px; --note-color:#f76707; animation-delay:-9.4s;"></span>
+              </div>
+            </div>
+            <div class="hero-judgeline"></div>
+          </div>
+
+          <div class="hero text-center px-2">
+            <div class="d-none d-md-block">
+              <h1 class="hero-logo mb-2">Tip Tap Notes</h1>
+              <h2 id="startTitleInitial" class="hero-title mb-3">🎵 Turn any song into a rhythm game</h2>
+            </div>
+            <div>
+              <p id="startHintInitial1" class="text-muted small mb-1">Just load an audio file (MP3/WAV/OGG, etc.) and start playing</p>
+              <p id="startHintInitial2" class="text-muted small">Drag &amp; drop your file</p>
+            </div>
+            <div class="d-none d-md-block">
+              <div id="startFeatureBadges" class="d-flex flex-wrap gap-2 justify-content-center my-2">
+                <span class="feature-chip">🎯 Any song, automatically charted</span>
+                <span class="feature-chip">🎹 MIDI / SF2 / SF3 support</span>
+                <span class="feature-chip">💻 No install needed</span>
+              </div>
+            </div>
+            <!-- File selector (MIDI / SoundFont / audio files, single entry) -->
+            <div id="selectPanel" class="card border-secondary-subtle border-dashed mt-3 mx-auto"
+                 style="max-width: 34rem;">
+              <div class="card-body py-3 px-3 d-flex flex-wrap gap-2 align-items-center justify-content-center">
+                <button id="selectFile" class="btn btn-primary rounded-pill">Select file</button>
+                <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
+                <button id="openLibrary" class="btn btn-outline-info rounded-pill"
+                        data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 Choose from MIDI library</button>
+                <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill"
+                        data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 Choose from SoundFont library</button>
+              </div>
+            </div>
+
+            <div id="keyHintStart" class="d-flex gap-1 mt-3 flex-wrap justify-content-center"></div>
+          </div>
+
+          <footer class="pt-md-5 alert text-center">
+            <div class="pt-3">
+              <a class="px-1" href="/">Home</a>
+              <a class="px-1" href="/terms/">Terms</a>
+              <a class="px-1" href="https://github.com/marmooo/tip-tap-notes">Contact</a>
+            </div>
+            <div class="text-muted">&copy; <a href="https://github.com/marmooo">marmooo</a>
+            </div>
+          </footer>
+        </div>
+
+        <!-- Ready screen -->
+        <div id="screenReady" class="overlay hidden">
+          <div id="playLengthToggle" class="btn-group mb-3" role="group" aria-label="Play length">
+            <input type="radio" class="btn-check" name="playLength" id="playLengthShort"
+                   data-length="short" autocomplete="off" checked>
+            <label class="btn btn-outline-primary" for="playLengthShort">SHORT<br>(2:00)</label>
+
+            <input type="radio" class="btn-check" name="playLength" id="playLengthOriginal"
+                   data-length="original" autocomplete="off">
+            <label class="btn btn-outline-primary" for="playLengthOriginal">ORIGINAL</label>
+          </div>
+          <button id="btnBigStart" type="button"
+                  class="btn btn-primary rounded-circle fw-bold d-flex flex-column
+                         align-items-center justify-content-center mb-3"
+                  style="width:8rem;height:8rem;font-size:1.1rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"
+                 viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+              <path d="M320-203v-560l440 280-440 280Z"></path>
+            </svg>
+            Start
+          </button>
+          <p id="readyHintAudio" class="text-muted small mb-1" data-hint-mode="audio">Chart will be generated automatically when you start</p>
+          <div class="d-flex gap-1 flex-wrap justify-content-center mb-1">
+            <span id="keyHintReady" class="d-inline-flex gap-1 flex-wrap justify-content-center"></span>
+          </div>
+          <p class="small text-muted mb-3">You can also start with the Space key</p>
+          <p class="small text-muted mb-1">Difficulty: <strong id="diffLabel" class="text-warning-emphasis">—</strong>
+            　Notes: <span id="noteCountLabel">—</span></p>
+          <button id="btnChangeFileReady" type="button"
+                  class="btn btn-sm btn-link text-muted mt-1">📂 Back to start screen</button>
+        </div>
+
+        <!-- Analyzing screen (audio mode only) -->
+        <div id="screenAnalyzing" class="overlay hidden">
+          <h2 class="fw-bold mb-3 text-warning-emphasis">🔍 Generating chart…</h2>
+          <div id="analyzingProgressWrap" class="progress" style="height:8px;">
+            <div class="progress-bar bg-warning" id="analyzingProgressBar" style="width:0%"></div>
+          </div>
+          <p id="analyzingStage" class="small text-muted mt-2"></p>
+        </div>
+
+        <!-- Result screen -->
+        <div id="screenResult" class="overlay hidden">
+          <div class="card p-4 text-center border-secondary-subtle" style="min-width:270px;">
+            <div id="resultGrade" class="grade-badge mb-2"></div>
+            <h3 class="fw-bold mb-3 text-warning-emphasis">RESULT</h3>
+            <table id="resultTable" class="mx-auto mb-3 small">
+              <tr><td class="label">Score</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
+              <tr><td class="label">Accuracy</td> <td id="rAccuracy" class="text-end"></td></tr>
+              <tr><td class="label">Max Combo</td><td id="rCombo"    class="text-end"></td></tr>
+              <tr><td class="label">Perfect</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
+              <tr><td class="label">Great</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
+              <tr><td class="label">Good</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
+              <tr><td class="label">Miss</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
+            </table>
+            <button id="btnBigReplay" type="button"
+                    class="btn btn-primary rounded-pill fw-bold px-4 py-2">
+              ▶ Play again
+            </button>
+            <p class="small text-muted mt-2 mb-0">You can also replay with the Space key</p>
+            <div>
+              <button id="btnChangeFileResult" type="button"
+                      class="btn btn-sm btn-link text-muted mt-2">📂 Back to start screen</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings (Bootstrap modal) -->
+        <div class="modal" id="screenSettings" tabindex="-1"
+             aria-labelledby="screenSettingsLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content" id="settingsPanel">
+
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold text-warning-emphasis" id="screenSettingsLabel">⚙ Settings</h5>
+                <button type="button" class="btn-close" id="btnCloseSettings"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+
+              <div class="modal-body" id="settingsBody">
+
+            <div class="mb-3">
+              <label class="form-label">Difficulty</label>
+              <select class="form-select form-select-sm" id="difficulty">
+                <option value="EASY">EASY — ≈1–1.5 nps, no chords (beginners)</option>
+                <option value="BASIC">BASIC — ≈2–3 nps, max 2 simultaneous (casual)</option>
+                <option value="NORMAL" selected>NORMAL — ≈4–6 nps, max 3 simultaneous (standard)</option>
+                <option value="HARD">HARD — ≈6–12 nps, max 4 simultaneous (advanced)</option>
+              </select>
+              <div class="small text-muted mt-1">
+                ※ Simultaneous notes are automatically limited when lane count is low<br>
+                <span id="audioDiffNote" class="hidden">※ In audio mode, changing difficulty regenerates the chart on the next play.</span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                Lane count <span id="laneCountVal">4</span>
+              </label>
+              <input type="range" class="form-range" id="laneCount" min="2" max="8" step="1" value="4">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                Scroll speed <span id="scrollSpeedVal">500</span>
+              </label>
+              <input type="range" class="form-range" id="scrollSpeed" min="150" max="1200" step="50" value="500">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Lane keys</label>
+              <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">1</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">2</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">3</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">4</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">5</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">6</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">7</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">8</span>
+                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                </label>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Lane colors</label>
+              <div id="laneColorPickers" class="lane-color-grid">
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">1</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">2</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">3</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">4</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">5</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">6</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">7</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+                <label class="lane-input-wrap">
+                  <span class="small text-muted">8</span>
+                  <input type="color" class="form-control form-control-color">
+                </label>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                Lane opacity <span id="laneOpacityVal">0.35</span>
+              </label>
+              <input type="range" class="form-range" id="laneOpacity" min="0" max="1" step="0.05" value="0.35">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                Button text color (accent)
+                <span class="d-flex align-items-center gap-1">
+                  <input type="color" id="accentColor" class="form-control form-control-color"
+                         style="width:2.5em;height:1.8em;padding:2px;">
+                  <button type="button" id="btnResetAccentColor"
+                          class="btn btn-sm btn-outline-secondary py-0 px-2">Auto</button>
+                </span>
+              </label>
+              <div class="small text-muted mt-1">
+                Color for all canvas text: lane keys, combo, judgment, score, etc.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                Judgment line color
+                <span class="d-flex align-items-center gap-1">
+                  <input type="color" id="judgeLineColor" class="form-control form-control-color"
+                         style="width:2.5em;height:1.8em;padding:2px;">
+                  <button type="button" id="btnResetJudgeLineColor"
+                          class="btn btn-sm btn-outline-secondary py-0 px-2">Auto</button>
+                </span>
+              </label>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                Lane divider color
+                <span class="d-flex align-items-center gap-1">
+                  <input type="color" id="laneLineColor" class="form-control form-control-color"
+                         style="width:2.5em;height:1.8em;padding:2px;">
+                  <button type="button" id="btnResetLaneLineColor"
+                          class="btn btn-sm btn-outline-secondary py-0 px-2">Auto</button>
+                </span>
+              </label>
+              <div class="small text-muted mt-1">
+                Use a high-contrast color if hard to see on the background image.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                Judgment offset <span id="judgeOffsetVal">0ms</span>
+              </label>
+              <input type="range" class="form-range" id="judgeOffset"
+                     min="-200" max="200" step="5" value="0">
+              <div class="small text-muted mt-1">
+                Increase if audio is late, decrease if early.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="perspectiveEnabled" checked>
+                <label class="form-check-label" for="perspectiveEnabled">Perspective (narrower at the top)</label>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Background</label>
+              <select class="form-select form-select-sm mb-2" id="backgroundPreset">
+                <option value="">None</option>
+                <option value="./data/nasa-blue-marble.webp">Image 1: NASA Blue Marble</option>
+                <option value="./data/nasa-galaxy.webp">Image 2: NASA Galaxy</option>
+                <option value="./data/nasa-drift-ice.webp">Image 3: NASA Drift Ice</option>
+                <option value="./data/japan-river.webp">Image 4: Japan River</option>
+                <option value="./data/japan-lake.webp">Image 5: Japan Lake</option>
+                <option value="./data/japan-sky.webp" selected>Image 6: Japan Sky</option>
+                <option value="./data/japan-mountain.webp">Image 7: Japan Mountain</option>
+                <option value="./data/japan-pagoda.webp">Image 8: Japan Pagoda</option>
+                <option value="./data/japan-cave.webp">Image 9: Japan Cave</option>
+                <option value="./data/japan-shrine.webp">Image 10: Japan Shrine</option>
+                <option value="./data/fantasy-forest.webp">Image 11: Fantasy Forest</option>
+                <option value="./data/fantasy-lake.webp">Image 12: Fantasy Lake</option>
+                <option value="./data/fantasy-sea.webp">Image 13: Fantasy Sea</option>
+                <option value="./data/fantasy-flare.webp">Image 14: Fantasy Flare</option>
+                <option value="./data/cyber-space.webp">Image 15: Cyber Space</option>
+                <option value="./data/cyber-network.webp">Image 16: Cyber Network</option>
+                <option value="./data/cyber-magic.webp">Image 17: Cyber Magic</option>
+                <option value="./data/movie-earth.webm">Movie 1: Earth</option>
+                <option value="./data/movie-matrix-code.webm">Movie 2: Matrix Code</option>
+                <option value="./data/movie-number-stream.webm">Movie 3: Number Stream</option>
+                <option value="./data/movie-water.webm">Movie 4: Water</option>
+                <option value="custom">Custom file…</option>
+              </select>
+              <input class="form-control form-control-sm"
+                     type="file" id="backgroundFile" accept="image/*,video/*">
+            </div>
+
+              </div><!-- /settingsBody (modal-body) -->
+
+              <div class="modal-footer" id="settingsFooter">
+                <button type="button" id="btnCancelSettings" class="btn btn-outline-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btnApplySettings" class="btn btn-primary">Apply & close</button>
+              </div>
+
+            </div><!-- /settingsPanel (modal-content) -->
+          </div><!-- /modal-dialog -->
+        </div><!-- /screenSettings -->
+
+      </div><!-- /canvasWrap -->
+
+      <!-- MIDI library (Bootstrap modal) -->
+      <div class="modal" id="screenLibrary" tabindex="-1" aria-labelledby="screenLibraryLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold text-warning-emphasis" id="screenLibraryLabel">🎼 MIDI Library</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div id="libraryCollections" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
+              <div id="libraryInstruments" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
+              <div id="libraryColumns" class="small"></div>
+              <div class="table-responsive text-nowrap">
+                <table id="libraryTable" class="table table-sm table-striped w-100"></table>
+              </div>
+              <div id="libraryPagination" class="d-flex justify-content-center"></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /screenLibrary -->
+
+      <!-- SoundFont library (Bootstrap modal) -->
+      <div class="modal" id="soundFontLibraryModal" tabindex="-1" aria-labelledby="soundFontLibraryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold text-warning-emphasis" id="soundFontLibraryModalLabel">🎺 SoundFont Library</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form id="soundFontLibraryList" class="d-flex flex-column gap-1">Loading…</form>
+            </div>
+          </div>
+        </div>
+      </div><!-- /soundFontLibraryModal -->
+
+    </div>
+
+    <!-- i18n strings for game.js (alerts/error messages, analysis progress labels, etc.
+         Dynamic text not held as HTML elements. For localization, swap only this block.) -->
+    <div id="i18nStrings" hidden>
+      <span data-key="unsupportedFileType">Unsupported file type (supports MIDI / SoundFont / audio files)</span>
+      <span data-key="beatmapGenerationFailedPrefix">Chart generation failed: </span>
+      <span data-key="audioNotLoaded">Audio is not loaded</span>
+      <span data-key="analyzeTimeout">Analysis timed out ({seconds}s). The worker may have crashed.</span>
+      <span data-key="noOnsetDetected">No valid onsets (sound attacks) detected. The audio may be silent, extremely short, or very quiet.</span>
+      <span data-key="analyzeWorkerErrorPrefix">Analysis worker error: </span>
+      <span data-key="analyzeWorkerErrorUnknown">Analysis worker error (details unknown; check the console)</span>
+      <span data-key="soundFontLoadFailed">(load failed)</span>
+      <span data-key="stage-stft">Analyzing frequencies…</span>
+      <span data-key="stage-onset">Detecting onsets…</span>
+      <span data-key="stage-tempo">Estimating tempo…</span>
+      <span data-key="stage-grid">Snapping to beats…</span>
+      <span data-key="stage-notes">Generating notes…</span>
+      <span data-key="stage-done">Done</span>
+      <span data-key="stage-default">Analyzing…</span>
+    </div>
+
+    <div class="drop-inline-css
+      modal-backdrop show
+      form-control form-control-sm is-invalid
+      pagination page-item page-link active
+      btn-check btn btn-sm btn-outline-primary btn-outline-secondary m-1
+      d-none"></div>
+    <script type="module" src="/tip-tap-notes/index.js"></script>
+  </body>
+</html>
