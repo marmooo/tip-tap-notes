@@ -1,4 +1,4 @@
-# tip-tap-notes
+# Tip Tap Notes
 
 A browser-based falling-note rhythm game that automatically generates charts
 just by loading music files (MP3/WAV/OGG, etc.). Built around hold notes. You
