@@ -82,6 +82,9 @@ const DEFAULT_CONFIG = {
   judgeLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
   laneLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
   backgroundPreset: "./data/japan-sky.webp", // 初期値はJapan Sky。""=なし / プリセットURL / "custom"（本体は IndexedDB に保存）
+  // Canvas 解像度の上限（devicePixelRatio をこの値でキャップ）。
+  // 既定 2 = Retina 相当。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
+  maxPixelRatio: 2,
 };
 
 function loadConfig() {
@@ -107,6 +110,11 @@ function rgbToHex(rgbStr) {
     .join("");
 }
 let config = loadConfig();
+// 旧設定や不正値を既定範囲に丸める
+{
+  const v = Number(config.maxPixelRatio);
+  config.maxPixelRatio = Number.isFinite(v) ? Math.min(3, Math.max(1, v)) : 2;
+}
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -151,7 +159,16 @@ const htmlLang = document.documentElement.lang || "en";
 // State
 // ---------------------------------------------------------------------------
 
-const dpr = globalThis.devicePixelRatio || 1;
+// Canvas の実効 DPR。devicePixelRatio を config.maxPixelRatio でキャップする。
+// 既定は 2（Retina 相当）で、高 DPI 端末でのメモリ/GPU 負荷を抑えて落ちにくくする。
+// 設定画面から変更可能。変更時は Worker / OffscreenCanvas を再構築する。
+function computeDpr() {
+  const device = globalThis.devicePixelRatio || 1;
+  const cap = Number(config.maxPixelRatio);
+  if (!Number.isFinite(cap) || cap <= 0) return device;
+  return Math.min(device, cap);
+}
+let dpr = computeDpr();
 let mode = null; // null | "midi" | "audio" — 最初のファイル読込までは未確定
 let rawNotes = []; // NoteData[]（midy由来 or 音声解析由来。形は共通）
 let laneNotes = []; // thinNotes済み
@@ -167,6 +184,12 @@ let maxDuration = Infinity; // applyNotes() 実行時に playLength から算出
 let endingFadeStarted = false; // SHORTモードでの強制終了フェードを開始済みか
 let endingFadeStartPerf = 0; // フェード開始時点の performance.now()（下記参照）
 let endingFadeTimeoutId = null; // rAF停止時でもフェード完了→showResultを保証するタイマー
+
+// applyNotes の再計算・Worker への再送を抑えるキー。リプレイ時に同じ譜面を
+// 何度も thinNotes + structured clone するとピークメモリが跳ねるため、
+// 設定・譜面が変わっていないときは再計算/再送をスキップする。
+let lastApplyKey = "";
+let notesPostedToWorker = false; // 現在の Worker に laneNotes が載っているか
 
 let notesReady = false; // 音声モード: 現在の設定で譜面生成済みか
 let notesStale = true; // 音声モード: 設定変更等で再生成が必要か
@@ -341,14 +364,30 @@ function computeUiColor() {
 
 function initWorker() {
   if (worker) {
-    worker.terminate();
+    try {
+      worker.terminate();
+    } catch {
+      /* ignore */
+    }
     worker = null;
   }
+  notesPostedToWorker = false;
   replaceCanvases();
 
   worker = new Worker("./rhythm-game-worker.js", { type: "module" });
   worker.onmessage = onWorkerMessage;
-  worker.onerror = (err) => console.error("rhythm-game-worker crashed:", err);
+  // Worker が落ちた場合は参照を捨て、次回 ensureWorker / startGameMidi で
+  // 再構築できるようにする（null のまま残すとリプレイが永久に動かなくなる）。
+  worker.onerror = (err) => {
+    console.error("rhythm-game-worker crashed:", err);
+    try {
+      worker?.terminate();
+    } catch {
+      /* ignore */
+    }
+    worker = null;
+    notesPostedToWorker = false;
+  };
 
   const r = canvasWrap.getBoundingClientRect();
   const w = Math.round(r.width * dpr);
@@ -460,7 +499,7 @@ function getSongDuration() {
   return audioBuffer ? audioBuffer.duration : 0;
 }
 
-function applyNotes() {
+function applyNotes(forceResend = false) {
   if (!worker || rawNotes.length === 0) return;
   // 曲の実尺が SHORT_DURATION 未満の場合、maxDuration を SHORT_DURATION 固定に
   // してしまうと t が maxDuration に到達せず handleShortEnding() が発火しない
@@ -478,14 +517,34 @@ function applyNotes() {
   } else {
     maxDuration = Infinity;
   }
-  const diff = DIFFICULTIES[config.difficulty] ?? DIFFICULTIES.NORMAL;
-  const notes = rawNotes.filter((n) => n.startTime < maxDuration);
-  laneNotes = thinNotes(
-    notes.sort((a, b) => a.startTime - b.startTime),
+
+  // 同じ譜面・同じ設定なら thinNotes の再計算を省略する。
+  // リプレイ時に毎回フル配列を structured clone するとピークメモリが跳ねるので、
+  // Worker に既に載っている場合は postMessage 自体もスキップする。
+  const applyKey = [
+    playLength,
+    maxDuration,
     config.laneCount,
-    diff,
-  );
+    config.difficulty,
+    rawNotes.length,
+  ].join("|");
+  if (applyKey === lastApplyKey && laneNotes.length > 0) {
+    if (forceResend || !notesPostedToWorker) {
+      worker.postMessage({ type: "setNotes", notes: laneNotes });
+      notesPostedToWorker = true;
+    }
+    return;
+  }
+
+  const diff = DIFFICULTIES[config.difficulty] ?? DIFFICULTIES.NORMAL;
+  // sort は破壊的なのでコピーしてから並べる（rawNotes の順序を壊さない）
+  const notes = rawNotes
+    .filter((n) => n.startTime < maxDuration)
+    .sort((a, b) => a.startTime - b.startTime);
+  laneNotes = thinNotes(notes, config.laneCount, diff);
+  lastApplyKey = applyKey;
   worker.postMessage({ type: "setNotes", notes: laneNotes });
+  notesPostedToWorker = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -600,6 +659,13 @@ function buildGame() {
   renderKeyHints();
 }
 
+// Worker が無いときだけ構築する。リプレイや 2 回目以降の start では
+// 既存の OffscreenCanvas + Worker を再利用し、Canvas×3 の破棄・再確保による
+// メモリ/GPU スパイクを避ける。
+function ensureWorker() {
+  if (!worker) buildGame();
+}
+
 function beginPlayback() {
   endingFadeStarted = false;
   endingFadeStartPerf = 0;
@@ -644,9 +710,27 @@ function beginPlayback() {
 }
 
 function applyConfigToGame(cfg) {
-  const laneOrDiffChanged = cfg.laneCount !== config.laneCount ||
+  const laneCountChanged = cfg.laneCount !== config.laneCount;
+  const laneOrDiffChanged = laneCountChanged ||
     cfg.difficulty !== config.difficulty;
+  // レーン数・遠近感・スクロール速度など描画構造に関わる変更だけ Worker を
+  // 作り直す。色やキー割り当てだけなら updateOptions で足りるが、現状の
+  // Worker 契約は setNotes 再送と reset を兼ねた rebuild の方が安全なため、
+  // 構造変更時のみ rebuild、それ以外のプレイ中変更は rebuild せずオプション更新。
+  const dprChanged = Number(cfg.maxPixelRatio) !== Number(config.maxPixelRatio);
+  const structuralChanged = laneCountChanged ||
+    dprChanged ||
+    (cfg.perspectiveEnabled ?? true) !== (config.perspectiveEnabled ?? true) ||
+    cfg.scrollSpeed !== config.scrollSpeed ||
+    (cfg.laneOpacity ?? 0.35) !== (config.laneOpacity ?? 0.35) ||
+    JSON.stringify(cfg.laneColors?.slice(0, cfg.laneCount)) !==
+      JSON.stringify(config.laneColors?.slice(0, config.laneCount)) ||
+    JSON.stringify(cfg.laneKeys?.slice(0, cfg.laneCount)) !==
+      JSON.stringify(config.laneKeys?.slice(0, config.laneCount));
+
   config = cfg;
+  // maxPixelRatio 変更時は実効 dpr を更新（構造変更時は後続の buildGame で反映）
+  if (dprChanged) dpr = computeDpr();
 
   if (mode === "audio" && laneOrDiffChanged) {
     // 音声モードは難易度/レーン数がビートマップ生成自体に影響するため、
@@ -655,23 +739,61 @@ function applyConfigToGame(cfg) {
   }
 
   if (gamePhase === "playing" && !endingFadeStarted) {
-    stopRaf();
-    buildGame();
-    applyNotes();
-    worker.postMessage({ type: "start" });
-    lastResult = {
-      score: 0,
-      combo: 0,
-      perfect: 0,
-      great: 0,
-      good: 0,
-      miss: 0,
-      total: laneNotes.length,
-    };
-    startRaf();
-    gamePhase = "playing";
+    if (structuralChanged || laneOrDiffChanged) {
+      // 譜面配置やレーン構造が変わるので Worker を立て直して notes を再送
+      stopRaf();
+      buildGame();
+      applyNotes();
+      worker.postMessage({ type: "start" });
+      lastResult = {
+        score: 0,
+        combo: 0,
+        perfect: 0,
+        great: 0,
+        good: 0,
+        miss: 0,
+        total: laneNotes.length,
+      };
+      startRaf();
+      gamePhase = "playing";
+    } else {
+      // 色・オフセット等のみ：既存 Worker にパッチを送るだけ（Canvas 再確保しない）
+      worker?.postMessage({
+        type: "updateOptions",
+        patch: {
+          laneColors: config.laneColors.slice(0, config.laneCount),
+          keys: config.laneKeys.slice(0, config.laneCount),
+          judgeOffset: (config.judgeOffset ?? 0) / 1000,
+          uiColor: computeUiColor(),
+          judgeLineColor: config.judgeLineColor || "",
+          laneLineColor: config.laneLineColor || "",
+          accentColor: config.accentColor || "",
+          laneOpacity: config.laneOpacity ?? 0.35,
+        },
+      });
+    }
   } else if (gamePhase !== "playing") {
-    buildGame();
+    // 非プレイ中は構造が変わっていなくても設定プレビュー用に Worker を
+    // 揃えておく。ただし既に Worker があり構造不変なら rebuild 不要。
+    if (!worker || structuralChanged || laneOrDiffChanged) {
+      buildGame();
+    } else {
+      worker.postMessage({
+        type: "updateOptions",
+        patch: {
+          laneColors: config.laneColors.slice(0, config.laneCount),
+          keys: config.laneKeys.slice(0, config.laneCount),
+          judgeOffset: (config.judgeOffset ?? 0) / 1000,
+          uiColor: computeUiColor(),
+          judgeLineColor: config.judgeLineColor || "",
+          laneLineColor: config.laneLineColor || "",
+          accentColor: config.accentColor || "",
+          laneOpacity: config.laneOpacity ?? 0.35,
+          scrollSpeed: config.scrollSpeed,
+          perspective: (config.perspectiveEnabled ?? true) ? PERSPECTIVE : 0,
+        },
+      });
+    }
     if (rawNotes.length > 0) applyNotes();
   }
   // gamePhase==="playing" && endingFadeStarted の場合は何もしない。
@@ -714,7 +836,14 @@ function showResult() {
     clearTimeout(endingFadeTimeoutId);
     endingFadeTimeoutId = null;
   }
-  worker?.postMessage({ type: "stop" });
+  // stop で描画ループ・アクティブ判定を止める。
+  // 譜面配列自体は Worker に残し、リプレイ時の setNotes 再送（structured clone）を
+  // 避ける。高負荷 MIDI ではこの clone がピークメモリを押し上げる一因になる。
+  try {
+    worker?.postMessage({ type: "stop" });
+  } catch (err) {
+    console.error("worker stop failed:", err);
+  }
   gamePhase = "result";
   isPaused = false;
   pauseOverlay.classList.add("hidden");
@@ -870,6 +999,9 @@ function readSettingsUI() {
     difficulty: document.getElementById("difficulty")?.value || "NORMAL",
     judgeOffset:
       parseInt(document.getElementById("judgeOffset")?.value ?? "0", 10) || 0,
+    maxPixelRatio: parseFloat(
+      document.getElementById("maxPixelRatio")?.value ?? "2",
+    ) || 2,
   };
 }
 
@@ -890,6 +1022,8 @@ function openSettings() {
   st("laneCountVal", config.laneCount);
   sv("scrollSpeed", config.scrollSpeed);
   st("scrollSpeedVal", config.scrollSpeed);
+  sv("maxPixelRatio", config.maxPixelRatio ?? 2);
+  st("maxPixelRatioVal", config.maxPixelRatio ?? 2);
   sv("difficulty", config.difficulty);
   const persEl = document.getElementById("perspectiveEnabled");
   if (persEl) persEl.checked = config.perspectiveEnabled ?? true;
@@ -1038,6 +1172,7 @@ document.getElementById("btnResetLaneLineColor")?.addEventListener(
   ["scrollSpeed", "scrollSpeedVal"],
   ["laneOpacity", "laneOpacityVal"],
   ["judgeOffset", "judgeOffsetVal"],
+  ["maxPixelRatio", "maxPixelRatioVal"],
 ].forEach(([sid, lid]) => {
   document.getElementById(sid)?.addEventListener("input", (e) => {
     const el = document.getElementById(lid);
@@ -1275,6 +1410,8 @@ function switchMode(next) {
 
   rawNotes = [];
   laneNotes = [];
+  lastApplyKey = "";
+  notesPostedToWorker = false;
   notesReady = false;
   notesStale = true;
   buildGame();
@@ -1325,18 +1462,43 @@ async function ensureMidiStopped() {
   }
 }
 
+// startMidiPlayback() で一度でも midy.start() を呼んだかどうか。
+// 「一度も再生していない曲への初回 start」と「自然終了後のリプレイ start」を
+// 区別するために使う（詳細は startMidiPlayback() 内のコメント参照）。
+let midiHasStartedOnce = false;
+
 async function startMidiPlayback() {
   // SHORT終了後は pause() で止めているので resume() で先頭から再開できる。
   // キャッシュが保持されているため SoundFont の再読み込みも不要。
+  // ※ これは意図的な高速リプレイ用の分岐なので変更しない。
   if (midy.isPaused) {
     await midy.resume();
     return;
   }
-  // 初回・別曲切替後は従来通り stop → loadSoundFont → start。
-  await ensureMidiStopped();
+  // ORIGINAL 完走時や、曲が SHORT_DURATION 未満で自然終了したときは
+  // pause() ではなく stop 相当の自然終了（isPlaying=false, isPaused=false）になる。
+  // この状態から ensureMidiStopped() を呼んでも、そのガード
+  // 「!isPlaying && !isPaused なら何もしない」に引っかかって
+  // 実際には midy.stop() が一度も呼ばれない。
+  // そのため内部の再生状態（スケジュール済みノート／アクティブボイス等）が
+  // リセットされないまま次の midy.start() が積み重なり、2回目以降の
+  // リプレイで処理が追いつかずハングする原因になっていた。
+  // 「一度でも再生したことがある」場合は、isPlaying/isPaused の値に関わらず
+  // 必ず stop() してから start() し直す（初回の未再生インスタンスに対しては
+  // 従来通り stop() を呼ばない＝ensureMidiStopped() のガードを維持する）。
+  if (midiHasStartedOnce) {
+    try {
+      await midy.stop();
+    } catch (err) {
+      console.error("midy.stop failed:", err);
+    }
+  } else {
+    await ensureMidiStopped();
+  }
   await midy.loadSoundFont(getSoundFontPaths());
   midy.setMasterVolume(1, audioContext.currentTime);
   await midy.start();
+  midiHasStartedOnce = true;
 }
 
 async function loadMIDIBytes(bytes) {
@@ -1344,8 +1506,10 @@ async function loadMIDIBytes(bytes) {
   await ensureMidiStopped();
   await midy.loadMIDI(bytes);
   rawNotes = extractNotesFromMidy(midy);
+  lastApplyKey = "";
+  notesPostedToWorker = false;
   buildGame();
-  applyNotes();
+  applyNotes(true);
   updatePlayLengthLabels();
   showScreen("ready");
 }
@@ -1507,7 +1671,11 @@ document.getElementById("openSoundFontLibrary").addEventListener(
 // ---------------------------------------------------------------------------
 
 function startGameMidi() {
-  buildGame();
+  // リプレイ・2 回目以降の start では既存 Worker / OffscreenCanvas を再利用。
+  // 毎回 initWorker() すると Canvas×3 の GPU バッファ破棄・再確保が走り、
+  // メモリ/GPU のピークが跳ねやすい。
+  ensureWorker();
+  // 同一譜面なら thinNotes / structured clone はスキップされる。
   applyNotes();
   beginPlayback();
 }
