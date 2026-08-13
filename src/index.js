@@ -1288,6 +1288,7 @@ function switchMode(next) {
 
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
+midy.cacheMode = "chunk";
 midy.startDelay = START_DELAY_MIDI;
 
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";
