@@ -77,7 +77,13 @@ self.onmessage = (e) => {
     }
 
     case "resize": {
-      if (game) game.resize(msg.width, msg.height);
+      if (game) {
+        game.resize(msg.width, msg.height, {
+          topInset: msg.topInset,
+          buttonZoneHeight: msg.buttonZoneHeight,
+          dpr: msg.dpr,
+        });
+      }
       break;
     }
   }

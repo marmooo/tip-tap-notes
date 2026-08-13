@@ -83,8 +83,8 @@ const DEFAULT_CONFIG = {
   laneLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
   backgroundPreset: "./data/japan-sky.webp", // 初期値はJapan Sky。""=なし / プリセットURL / "custom"（本体は IndexedDB に保存）
   // Canvas 解像度の上限（devicePixelRatio をこの値でキャップ）。
-  // 既定 2 = Retina 相当。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
-  maxPixelRatio: 2,
+  // 既定 1 = 負荷を抑えて安定優先。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
+  maxPixelRatio: 1,
 };
 
 function loadConfig() {
@@ -113,7 +113,7 @@ let config = loadConfig();
 // 旧設定や不正値を既定範囲に丸める
 {
   const v = Number(config.maxPixelRatio);
-  config.maxPixelRatio = Number.isFinite(v) ? Math.min(3, Math.max(1, v)) : 2;
+  config.maxPixelRatio = Number.isFinite(v) ? Math.min(3, Math.max(1, v)) : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,16 +244,15 @@ function resizeCanvases() {
   const h = Math.round(r.height * dpr);
   // rhythm-game-worker.js 側でスコア等の右上 HUD を描く際、canvas 座標系
   // （dpr 込み）でどれだけ避ければ #topnav と重ならないかを渡す。
-  // 【要対応】rhythm-game-worker.js 側で resize メッセージの topInset を
-  // 受け取り、スコア/コンボ等の右上 HUD 描画の開始 y 座標に加算する必要が
-  // あるが、このファイルからは rhythm-game-worker.js の中身を確認・編集
-  // できていないので未反映。
+  // buttonZoneHeight / dpr も一緒に送り、向き変更時も見た目比率を保つ。
   if (worker) {
     worker.postMessage({
       type: "resize",
       width: w,
       height: h,
       topInset: computeTopInset(),
+      buttonZoneHeight: Math.round(h * 0.2),
+      dpr,
     });
   }
   try {
@@ -330,7 +329,9 @@ function buildWorkerOptions() {
   const h = Math.round(canvasWrap.getBoundingClientRect().height * dpr);
   return {
     laneCount,
+    // scrollSpeed / noteHeight は論理px（dpr=1基準）。Worker 側で dpr を掛けて描画する。
     scrollSpeed: config.scrollSpeed,
+    dpr,
     laneColors: config.laneColors.slice(0, laneCount),
     keys,
     judgmentWindows: {
@@ -348,8 +349,7 @@ function buildWorkerOptions() {
     judgeLineColor: config.judgeLineColor || "",
     laneLineColor: config.laneLineColor || "",
     accentColor: config.accentColor || "",
-    // 【要対応】rhythm-game-worker.js 側は現状この値を知らないので、
-    // 右上 HUD の描画開始 y 座標に加算する処理を追加する必要がある。
+    // canvas 座標系（dpr込み）での navbar 回避量。HUD 描画開始 y に加算する。
     topInset: computeTopInset(),
   };
 }
@@ -1000,8 +1000,8 @@ function readSettingsUI() {
     judgeOffset:
       parseInt(document.getElementById("judgeOffset")?.value ?? "0", 10) || 0,
     maxPixelRatio: parseFloat(
-      document.getElementById("maxPixelRatio")?.value ?? "2",
-    ) || 2,
+      document.getElementById("maxPixelRatio")?.value ?? "1",
+    ) || 1,
   };
 }
 
@@ -1022,8 +1022,8 @@ function openSettings() {
   st("laneCountVal", config.laneCount);
   sv("scrollSpeed", config.scrollSpeed);
   st("scrollSpeedVal", config.scrollSpeed);
-  sv("maxPixelRatio", config.maxPixelRatio ?? 2);
-  st("maxPixelRatioVal", config.maxPixelRatio ?? 2);
+  sv("maxPixelRatio", config.maxPixelRatio ?? 1);
+  st("maxPixelRatioVal", config.maxPixelRatio ?? 1);
   sv("difficulty", config.difficulty);
   const persEl = document.getElementById("perspectiveEnabled");
   if (persEl) persEl.checked = config.perspectiveEnabled ?? true;

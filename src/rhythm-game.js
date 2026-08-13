@@ -447,6 +447,7 @@ const DEFAULT_LANE_COLORS = [
 ];
 
 // 判定FX の定義テーブル（毎フレームのswitch/文字列生成を回避）
+// size は論理px（dpr=1基準）。描画時に o.dpr を掛ける。
 const FX_TABLE = {
   [Judgment.PERFECT]: { text: "PERFECT", color: "#ffe066", size: 20 },
   [Judgment.GREAT]: { text: "GREAT", color: "#aaffaa", size: 19 },
@@ -511,13 +512,18 @@ export class RhythmGame {
     this.#uiCtx = this.#uiCanvas.getContext("2d");
 
     const laneCount = options.laneCount ?? 4;
+    // dpr: canvas バッファは CSS サイズ × dpr。論理px（dpr=1基準）の定数は
+    // 描画時に dpr を掛けて、高DPIでも見た目サイズが PC と同じになるようにする。
+    const dpr = Number(options.dpr) > 0 ? Number(options.dpr) : 1;
     this.#opts = {
       laneCount,
+      dpr,
       glow: options.glow ?? false,
       // レーン（判定ボタン部分）の背景・境界線の不透明度スケール（1.0=デフォルトの強さ）。
       // ノート自体は常に不透明固定なので、これはレーン側だけの見え方を調整する
       // 独立した設定。
       laneOpacity: options.laneOpacity ?? 1.0,
+      // scrollSpeed / noteHeight は論理px（dpr=1基準）。描画・落下計算で dpr を掛ける。
       scrollSpeed: options.scrollSpeed ?? 500,
       noteHeight: options.noteHeight ?? 36,
       buttonZoneHeight: options.buttonZoneHeight ?? 80,
@@ -633,7 +639,7 @@ export class RhythmGame {
     this.#uiDirty = true;
   }
 
-  resize(w, h) {
+  resize(w, h, extra = {}) {
     this.#canvas.width = w;
     this.#canvas.height = h;
     if (this.#pCanvas !== this.#canvas) {
@@ -644,6 +650,15 @@ export class RhythmGame {
       this.#uiCanvas.width = w;
       this.#uiCanvas.height = h;
     }
+    if (extra.topInset !== undefined) {
+      this.#opts.topInset = extra.topInset;
+    }
+    if (extra.buttonZoneHeight !== undefined) {
+      this.#opts.buttonZoneHeight = extra.buttonZoneHeight;
+    }
+    if (extra.dpr !== undefined && Number(extra.dpr) > 0) {
+      this.#opts.dpr = Number(extra.dpr);
+    }
     this.#invalidateCache();
   }
 
@@ -651,6 +666,14 @@ export class RhythmGame {
     let dirty = false;
     if (patch.scrollSpeed !== undefined) {
       this.#opts.scrollSpeed = patch.scrollSpeed;
+      dirty = true;
+    }
+    if (patch.noteHeight !== undefined) {
+      this.#opts.noteHeight = patch.noteHeight;
+      dirty = true;
+    }
+    if (patch.dpr !== undefined && Number(patch.dpr) > 0) {
+      this.#opts.dpr = Number(patch.dpr);
       dirty = true;
     }
     if (patch.laneColors !== undefined) {
@@ -693,13 +716,20 @@ export class RhythmGame {
       this.#opts.topInset = patch.topInset;
       dirty = true;
     }
+    if (patch.buttonZoneHeight !== undefined) {
+      this.#opts.buttonZoneHeight = patch.buttonZoneHeight;
+      dirty = true;
+    }
     if (patch.judgeOffset !== undefined) {
       this.#opts.judgeOffset = patch.judgeOffset;
     }
     if (patch.judgmentWindows !== undefined) {
       this.#opts.windows = { ...this.#opts.windows, ...patch.judgmentWindows };
     }
-    if (dirty) this.#uiDirty = true;
+    if (dirty) {
+      this.#invalidateCache();
+      this.#uiDirty = true;
+    }
   }
 
   get score() {
@@ -896,8 +926,10 @@ export class RhythmGame {
     const x = lane * laneW + laneW / 2;
     const y = this.#canvas.height - this.#opts.buttonZoneHeight;
     const color = this.#opts.laneColors[lane % this.#opts.laneColors.length];
+    const d = this.#opts.dpr || 1;
 
     // 判定の良さでエフェクトの規模を変える（PERFECTが一番派手）
+    // 速度・サイズは論理px基準 × dpr（高DPIでも見た目の広がりが同じになる）
     const tier = judgment === Judgment.PERFECT
       ? 2
       : judgment === Judgment.GREAT
@@ -906,42 +938,42 @@ export class RhythmGame {
     const burstCount = 10 + tier * 4; // 10 / 14 / 18
     const shardCount = 6 + tier * 4; //  6 / 10 / 14
     const sparkCount = 2 + tier * 2; //  2 /  4 /  6
-    const ringMax = 42 + tier * 16; // 42 / 58 / 74
+    const ringMax = (42 + tier * 16) * d; // 42 / 58 / 74
 
     // 1) 放射状バースト（丸い光の粒）
     for (let k = 0; k < burstCount; k++) {
       const ang = Math.random() * 6.2832;
-      const spd = 120 + Math.random() * 260;
+      const spd = (120 + Math.random() * 260) * d;
       const life = 0.35 + Math.random() * 0.45;
       this.#particles.push({
         type: "burst",
         x,
         y,
         vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd - 90,
+        vy: Math.sin(ang) * spd - 90 * d,
         life,
         maxLife: life,
         color,
-        size: 3 + Math.random() * 4,
+        size: (3 + Math.random() * 4) * d,
       });
     }
 
     // 2) シャード：回転しながら飛び散る菱形の破片（弾けた質感を出す）
     for (let k = 0; k < shardCount; k++) {
       const ang = Math.random() * 6.2832;
-      const spd = 180 + Math.random() * 300;
+      const spd = (180 + Math.random() * 300) * d;
       const life = 0.28 + Math.random() * 0.35;
       this.#particles.push({
         type: "shard",
         x,
         y,
         vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd - 60,
+        vy: Math.sin(ang) * spd - 60 * d,
         life,
         maxLife: life,
         color,
-        w: 3 + Math.random() * 3,
-        h: 9 + Math.random() * 10,
+        w: (3 + Math.random() * 3) * d,
+        h: (9 + Math.random() * 10) * d,
         rot: Math.random() * 6.2832,
         rotSpeed: (Math.random() - 0.5) * 18,
       });
@@ -962,7 +994,7 @@ export class RhythmGame {
     // 4) スパーク：外側へ速く飛ぶ短い光の線（トレイル表現）
     for (let k = 0; k < sparkCount; k++) {
       const ang = Math.random() * 6.2832;
-      const spd = 380 + Math.random() * 220;
+      const spd = (380 + Math.random() * 220) * d;
       const life = 0.16 + Math.random() * 0.12;
       this.#particles.push({
         type: "spark",
@@ -986,12 +1018,12 @@ export class RhythmGame {
       life: beamLife,
       maxLife: beamLife,
       color,
-      height: 110 + tier * 60,
+      height: (110 + tier * 60) * d,
     });
 
     // 6) インパクトスパイク：8方向に固定で伸びる星形フラッシュ（弾けた瞬間の「ズドン」感）
     const spikeCount = 8;
-    const spikeLen = 34 + tier * 14;
+    const spikeLen = (34 + tier * 14) * d;
     const spikeLife = 0.16 + tier * 0.03;
     const spikeJitter = (Math.random() - 0.5) * 0.3; // 毎回同じ形にならないよう回転をわずかにずらす
     for (let k = 0; k < spikeCount; k++) {
@@ -1017,12 +1049,13 @@ export class RhythmGame {
         life: 0.12,
         maxLife: 0.12,
         color: "#ffffff",
+        radius: 46 * d,
       });
     }
   }
 
   #updateParticles(dt) {
-    const g = 480 * dt;
+    const g = 480 * (this.#opts.dpr || 1) * dt;
     let w = 0;
     for (let i = 0; i < this.#particles.length; i++) {
       const p = this.#particles[i];
@@ -1067,20 +1100,21 @@ export class RhythmGame {
     const o = this.#opts;
 
     // キャッシュ更新（リサイズ時のみ再計算）
+    // フォントサイズは論理px基準 × dpr で、高DPIでも CSS 上の見た目が同じになるようにする。
     if (W !== this.#cachedW || H !== this.#cachedH) {
       this.#cachedW = W;
       this.#cachedH = H;
       this.#cachedHitY = H - o.buttonZoneHeight;
       this.#cachedLaneW = W / o.laneCount;
-      // const btnH = o.buttonZoneHeight;
+      const d = o.dpr || 1;
       this.#cachedBtnFont = `bold ${
-        Math.min(22, this.#cachedLaneW * 0.28).toFixed(0)
+        Math.min(22 * d, this.#cachedLaneW * 0.28).toFixed(0)
       }px monospace`;
       this.#cachedHUDFont = `bold ${
-        Math.min(26, W * 0.05).toFixed(0)
+        Math.min(26 * d, W * 0.05).toFixed(0)
       }px monospace`;
       this.#cachedComboFont = `bold ${
-        Math.min(44, W * 0.09).toFixed(0)
+        Math.min(44 * d, W * 0.09).toFixed(0)
       }px sans-serif`;
       this.#uiDirty = true;
     }
@@ -1140,7 +1174,7 @@ export class RhythmGame {
 
   #drawLaneSeparators(ctx, W, _H, laneW, hitY, btnBot, o) {
     const p = o.perspective ?? 0;
-    // const cx = W / 2;
+    const d = o.dpr || 1;
     // レーン区切り線・疑似床グラデーション用の色（未設定なら uiColor にフォールバック）
     const lineColor = o.laneLineColor || o.uiColor;
     // laneOpacity と連動させる。元は 0.10 固定で、レーンの不透明度設定を変えても
@@ -1150,7 +1184,7 @@ export class RhythmGame {
     // 外枠・内側境界線
     // 下端 = btnBot（画面最下端）で左端0・右端W、上端 y=0 で中央に収束
     ctx.strokeStyle = withAlpha(lineColor, 0.35 * t);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * d;
     for (let l = 0; l <= o.laneCount; l++) {
       const xBot = l === 0
         ? 0
@@ -1185,16 +1219,16 @@ export class RhythmGame {
     const judgeColor = o.judgeLineColor || o.uiColor;
     ctx.save();
     ctx.shadowColor = withAlpha(judgeColor, 0.9);
-    ctx.shadowBlur = 18;
+    ctx.shadowBlur = 18 * d;
     ctx.strokeStyle = withAlpha(judgeColor, 0.92);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * d;
     ctx.beginPath();
     ctx.moveTo(0, hitY);
     ctx.lineTo(W, hitY);
     ctx.stroke();
-    ctx.shadowBlur = 36;
+    ctx.shadowBlur = 36 * d;
     ctx.strokeStyle = withAlpha(judgeColor, 0.35);
-    ctx.lineWidth = 7;
+    ctx.lineWidth = 7 * d;
     ctx.beginPath();
     ctx.moveTo(0, hitY);
     ctx.lineTo(W, hitY);
@@ -1204,7 +1238,9 @@ export class RhythmGame {
 
   #drawNotes(ctx, t, laneW, hitY, H, btnBot, o) {
     const notes = this.#notes;
-    const speed = o.scrollSpeed;
+    const d = o.dpr || 1;
+    // scrollSpeed / noteHeight は論理px基準 → canvas 座標では dpr 倍
+    const speed = o.scrollSpeed * d;
     const lookahead = H / speed + 0.3 + (o.startDelay ?? 0);
     // drawCursorスキップ判定用: 画面下端より下まで落下したノートを確認する秒数
     // const trailSec  = (H + o.buttonZoneHeight) / speed;
@@ -1226,14 +1262,14 @@ export class RhythmGame {
     const glow = o.glow;
     const laneColors = o.laneColors;
     const laneColorLen = laneColors.length;
-    const noteHeight = o.noteHeight;
+    const noteHeight = o.noteHeight * d;
     const cW = this.#canvas.width;
     const p = o.perspective ?? 0;
-    const pad = Math.max(2, laneW * 0.05);
+    const pad = Math.max(2 * d, laneW * 0.05);
 
     const prevAlpha = ctx.globalAlpha;
     const prevShadow = ctx.shadowBlur;
-    ctx.shadowBlur = glow ? 14 : 0;
+    ctx.shadowBlur = glow ? 14 * d : 0;
 
     // 台形ノートを描くヘルパー（p=0 のとき roundRect にフォールバック）
     const drawTrap = (laneIdx, yTop, yBot, fillStyle, alpha, r) => {
@@ -1291,7 +1327,7 @@ export class RhythmGame {
       const laneIdx = note.lane;
       const botNoteW = this.#perspLaneW(laneW, cW, yBot, hitY, p, btnBot) -
         pad * 2 * this.#perspScale(yBot, hitY, p);
-      const r = Math.min(8, botNoteW / 2);
+      const r = Math.min(8 * d, botNoteW / 2);
 
       ctx.shadowColor = color;
 
@@ -1316,7 +1352,7 @@ export class RhythmGame {
       const tapBot = drawBot;
       const tapTop = Math.max(0, tapBot - noteHeight);
       drawTrap(laneIdx, tapTop, tapBot, color, 1, r);
-      ctx.shadowBlur = glow ? 14 : 0;
+      ctx.shadowBlur = glow ? 14 * d : 0;
     }
 
     ctx.globalAlpha = prevAlpha;
@@ -1329,6 +1365,7 @@ export class RhythmGame {
     const colors = o.laneColors;
     const font = this.#cachedBtnFont;
     const p = o.perspective ?? 0;
+    const d = o.dpr || 1;
     // レーンの不透明度は 0(完全に透明)〜1(最大まで濃く)の通常の opacity と同じ考え方。
     // 元の16進アルファ決め打ち値（0d/44/40/88/22/cc 等）はどれも薄めだったため、
     // 1.0 のときにしっかり見える強さまで届くよう目標値を引き上げてある。
@@ -1366,7 +1403,7 @@ export class RhythmGame {
       if (pressed) {
         ctx.save();
         ctx.shadowColor = color;
-        ctx.shadowBlur = glow ? 30 : 12;
+        ctx.shadowBlur = (glow ? 30 : 12) * d;
         ctx.fillStyle = withAlpha(color, fillPressedA);
         trapPath();
         ctx.fill();
@@ -1390,7 +1427,7 @@ export class RhythmGame {
         color,
         pressed ? borderPressedA : borderIdleA,
       );
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 * d;
       // 左辺
       ctx.beginPath();
       ctx.moveTo(topL, hitY);
@@ -1409,7 +1446,7 @@ export class RhythmGame {
       const cy = hitY + btnH / 2;
       // 待機中は accentColor（設定可能・未設定なら uiColor）、押下中はレーン色で発光。
       ctx.shadowColor = color;
-      ctx.shadowBlur = pressed ? (glow ? 16 : 8) : 0;
+      ctx.shadowBlur = pressed ? (glow ? 16 : 8) * d : 0;
       drawText(
         ctx,
         (o.keys[l] ?? l + 1).toString().toUpperCase(),
@@ -1426,15 +1463,16 @@ export class RhythmGame {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const glow = o.glow;
+    const d = o.dpr || 1;
     for (let i = 0; i < this.#judgmentFx.length; i++) {
       const fx = this.#judgmentFx[i];
       const def = FX_TABLE[fx.judgment];
       const x = fx.lane * laneW + laneW / 2;
-      const y = hitY - 55 - (1 - fx.alpha) * 28;
+      const y = hitY - (55 + (1 - fx.alpha) * 28) * d;
       ctx.globalAlpha = fx.alpha < 0 ? 0 : fx.alpha;
       ctx.shadowColor = def.color;
-      ctx.shadowBlur = glow ? 10 : 0;
-      ctx.font = `bold ${def.size}px sans-serif`;
+      ctx.shadowBlur = glow ? 10 * d : 0;
+      ctx.font = `bold ${def.size * d}px sans-serif`;
       drawText(ctx, def.text, x, y, o.accentColor || o.uiColor);
     }
     ctx.globalAlpha = 1;
@@ -1443,6 +1481,7 @@ export class RhythmGame {
 
   #drawParticles(ctx, o) {
     const glow = o.glow;
+    const d = o.dpr || 1;
     const prevComposite = ctx.globalCompositeOperation;
     // 加算合成にすることで重なった光が明るく発光し、単なる不透明な粒より派手に見える
     ctx.globalCompositeOperation = "lighter";
@@ -1458,9 +1497,9 @@ export class RhythmGame {
           // 時間経過とともに半径が広がり、太さと不透明度が落ちていく光の輪
           const radius = p.maxRadius * (1 - a);
           ctx.shadowColor = p.color;
-          ctx.shadowBlur = glow ? 14 : 0;
+          ctx.shadowBlur = glow ? 14 * d : 0;
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 1 + 3 * a;
+          ctx.lineWidth = (1 + 3 * a) * d;
           ctx.beginPath();
           ctx.arc(p.x, p.y, Math.max(0.1, radius), 0, 6.2832);
           ctx.stroke();
@@ -1532,21 +1571,22 @@ export class RhythmGame {
         case "flash": {
           // 中心が一瞬強く光るラジアルグラデーション（PERFECT限定）
           ctx.shadowBlur = 0;
-          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 46);
+          const fr = p.radius ?? 46 * d;
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, fr);
           grad.addColorStop(0, p.color);
           grad.addColorStop(1, "transparent");
           ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 46, 0, 6.2832);
+          ctx.arc(p.x, p.y, fr, 0, 6.2832);
           ctx.fill();
           break;
         }
         case "spark": {
           // 進行方向へ短い光跡を残しながら飛ぶ線パーティクル
           ctx.shadowColor = p.color;
-          ctx.shadowBlur = glow ? 8 : 0;
+          ctx.shadowBlur = glow ? 8 * d : 0;
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2 * d;
           const trail = 0.02;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
@@ -1560,9 +1600,9 @@ export class RhythmGame {
           const dx = Math.cos(p.angle) * len;
           const dy = Math.sin(p.angle) * len;
           ctx.shadowColor = p.color;
-          ctx.shadowBlur = glow ? 12 : 0;
+          ctx.shadowBlur = glow ? 12 * d : 0;
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 4 * a + 0.5;
+          ctx.lineWidth = (4 * a + 0.5) * d;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
@@ -1573,7 +1613,7 @@ export class RhythmGame {
         case "shard": {
           // 回転しながら飛び散る菱形の破片（弾けた質感）
           ctx.shadowColor = p.color;
-          ctx.shadowBlur = glow ? 8 : 0;
+          ctx.shadowBlur = glow ? 8 * d : 0;
           ctx.fillStyle = p.color;
           ctx.save();
           ctx.translate(p.x, p.y);
@@ -1592,7 +1632,7 @@ export class RhythmGame {
         default: {
           const r = p.size * (0.5 + 0.5 * a);
           ctx.shadowColor = p.color;
-          ctx.shadowBlur = glow ? 6 : 0;
+          ctx.shadowBlur = glow ? 6 * d : 0;
           ctx.fillStyle = p.color;
           ctx.beginPath();
           ctx.arc(p.x, p.y, r, 0, 6.2832);
@@ -1611,11 +1651,12 @@ export class RhythmGame {
     ctx.textBaseline = "top";
     ctx.shadowBlur = 0;
     const textColor = o.accentColor || o.uiColor;
+    const d = o.dpr || 1;
 
     if (this.#combo >= 2) {
       ctx.font = this.#cachedComboFont;
       ctx.shadowColor = textColor;
-      ctx.shadowBlur = o.glow ? 12 : 0;
+      ctx.shadowBlur = o.glow ? 12 * d : 0;
       ctx.textAlign = "center";
       drawText(ctx, `${this.#combo} COMBO`, W / 2, H * 0.10, textColor);
       ctx.shadowBlur = 0;
@@ -1626,8 +1667,8 @@ export class RhythmGame {
     drawText(
       ctx,
       String(this.#score).padStart(7, "0"),
-      W - 10,
-      10 + (o.topInset || 0),
+      W - 10 * d,
+      10 * d + (o.topInset || 0),
       textColor,
     );
   }
