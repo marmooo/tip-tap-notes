@@ -75,12 +75,6 @@ export const Judgment = Object.freeze({
 /**
  * 難易度プリセット
  *
- * 【変更点】以前は minInterval / globalInterval を曲によらず固定の絶対秒数
- * で与えていたため、「高密度曲で実測した NPS」を前提にした値が、密度の低い
- * 曲では全く効かず（間引く対象がそもそも無い＝原曲密度がそのまま出る）、
- * 密度の高い曲では逆に一律の上限にへばりつく、という非対称な効き方をして
- * いた。結果として同じ NORMAL でも曲ごとの体感難易度が大きくばらついていた。
- *
  * 【方針】各譜面の難易度は「NPS（notes/sec）の帯」で定義し、間引きの強さ
  * （minInterval/globalInterval）は曲ごとに二分探索で逆算する。狙う帯は
  * osu!mania のスター評価がレーンごと・時間方向の密度をベースに算出して
@@ -92,10 +86,11 @@ export const Judgment = Object.freeze({
  * ための意図的な非対称性。
  *
  * NPS目安（曲ごとに二分探索で実測値をこの帯に収める）:
- *   EASY  ≒ 1.0〜1.5 nps — 音ゲー未経験者
- *   BASIC ≒ 2.0〜3.0 nps — カジュアルプレイヤー
- *   NORMAL≒ 4.0〜5.0 nps — 一般的な音ゲーのNORMAL相当
- *   HARD  ≒ 6.0〜10  nps — 上級者向け
+ *   EASY   ≒ 1.0〜1.5 nps — 音ゲー未経験者（同時押しなし）
+ *   BASIC  ≒ 2.0〜3.0 nps — 初心者（最大2）
+ *   NORMAL ≒ 3.0〜4.0 nps — カジュアル（最大2）※デフォルト
+ *   HARD   ≒ 4.0〜6.0 nps — 経験者（最大3）
+ *   EXPERT ≒ 6.0〜9.0 nps — 上級者（最大4）
  *
  * NPS の測定は単純な「総ノート数/曲長」ではなく、windowSec 秒のスライド窓
  * ごとの密度を取り、その percentile 分位点を代表値とする（measureNps 参照）。
@@ -104,34 +99,9 @@ export const Judgment = Object.freeze({
  *
  * globalIntervalRatio は探索する1変数（同一レーン間隔の基準値 iv）に対して
  * 全体最小間隔をどの比率で連動させるかを表す「形」のパラメータ。EASY/BASIC
- * は同時押しをほぼ許さない性格上わずかに広め（>1）、NORMAL/HARD は同時押し
- * を活かす分だけ全体間隔をやや詰める（<1）。密度の絶対量は targetNps 側が
+ * は同時押しをほぼ許さない性格上わずかに広め（>1）、NORMAL 以上は同時押し
+ * を活かす分だけ全体間隔をやや詰める（≤1）。密度の絶対量は targetNps 側が
  * 決めるため、ここは曲間で共通の「難易度ごとの手触り」だけを担う。
- *
- * 【楽器数が増えたときに NORMAL だけ体感難易度が急に上がる件について】
- * 実測してみると、二分探索そのものは連続的で「崖」は無い（候補ノートが
- * 増えるほど出力密度も滑らかに増える）。ただし帯の位置によって見え方が
- * 大きく違う：
- *   - EASY(1.0-1.5)/BASIC(2.0-3.0) は下限が低いので、楽器が1つでも
- *     大抵すぐ頭打ちになり、以降は楽器数を増やしても出力がほぼ変わらない
- *   - NORMAL(4.0-5.0) の下限4.0はちょうど「並の編成では届かないが、
- *     ある程度楽器が重なると届く」領域に位置しやすく、楽器数を増やす
- *     につれて出力密度がなだらかに、しかし目に見えて伸びていく
- *   - HARD(6.0-10.0) はさらに上で、多くの曲では下限にすら届かず頭打ち
- * つまり「NORMALだけ不連続に跳ね上がる」のではなく、「EASY/BASICは
- * どの曲でもすぐ頭打ちで動かず、HARDは逆にどの曲でも頭打ちで動かず、
- * 結果としてNORMALだけが編成の厚みに反応して伸び縮みする」という構図。
- * 曲ごとに実測した絶対密度で難易度を揃えるという設計自体は崩さず、
- * 対処としては以下の2点を反映した：
- *   1. HARD の下限を 6.0→5.0 に下げ、NORMAL の上限(5.0)と隣接させて
- *      「NORMALで頭打ちの曲がHARDでも全く同じ値に張り付く」幅を狭めた
- *      （HARD は excludeDrums:false によりドラムトラック分の候補が
- *      追加されるため、実際の曲ではこの隣接域でも大抵 NORMAL より
- *      いくらか高い値まで伸びる）
- *   2. 曲そのものの密度差（＝楽器の重なり方）が難易度を左右するのは
- *      物理的に避けられない部分なので、それでも急に感じる場合は
- *      NORMAL の帯そのものを曲間でさらに狭める（例:4.0-4.5等）調整も
- *      候補になる（要プレイ感の検証）
  *
  * レーン数によるスケール（thinNotes 内で動的適用、探索前と同じ）:
  *   maxSimultaneous = min(base, ceil(laneCount/2))
@@ -145,7 +115,7 @@ export const DIFFICULTIES = {
     minDuration: 0.25, // 250ms未満の短音除外（装飾音・経過音）
     targetNps: [1.0, 1.5],
     globalIntervalRatio: 1.15,
-    maxSimultaneous: 1, // 同時押しなし（4レーン基準）
+    maxSimultaneous: 1, // 同時押しなし
     excludeDrums: true,
   },
   BASIC: {
@@ -153,23 +123,31 @@ export const DIFFICULTIES = {
     minDuration: 0.15, // 150ms未満除外
     targetNps: [2.0, 3.0],
     globalIntervalRatio: 1.15,
-    maxSimultaneous: 2, // 4レーン時は同時2まで
+    maxSimultaneous: 2, // 最大2
     excludeDrums: true,
   },
   NORMAL: {
     label: "NORMAL",
-    minDuration: 0.08, // 80ms未満除外
-    targetNps: [4.0, 5.0],
-    globalIntervalRatio: 0.9,
-    maxSimultaneous: 3, // 4レーン時は同時2まで（ceil(4/2)=2で制限）
+    minDuration: 0.10, // 100ms未満除外
+    targetNps: [3.0, 4.0],
+    globalIntervalRatio: 1.0,
+    maxSimultaneous: 2, // 最大2
     excludeDrums: true,
   },
   HARD: {
     label: "HARD",
+    minDuration: 0.06, // 60ms未満除外
+    targetNps: [4.0, 6.0],
+    globalIntervalRatio: 0.9,
+    maxSimultaneous: 3, // 最大3
+    excludeDrums: true,
+  },
+  EXPERT: {
+    label: "EXPERT",
     minDuration: 0.04, // 40ms未満のみ除外
-    targetNps: [5.0, 10.0],
+    targetNps: [6.0, 9.0],
     globalIntervalRatio: 0.8,
-    maxSimultaneous: 4, // レーン数に応じて増加
+    maxSimultaneous: 4, // 最大4
     excludeDrums: false,
   },
 };
