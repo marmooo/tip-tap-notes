@@ -663,6 +663,18 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                Canvas解像度（最大DPR） <span id="maxPixelRatioVal">2</span>
+              </label>
+              <input type="range" class="form-range" id="maxPixelRatio" min="1" max="3" step="0.5" value="2">
+              <div class="small text-muted mt-1">
+                端末の devicePixelRatio に対する Canvas 解像度の上限です。
+                低いほどメモリ使用量が減りモバイルで安定しやすく、
+                高いほど高DPIディスプレイでくっきりします。既定値は 2。
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label">レーンキー</label>
               <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
                 <label class="lane-input-wrap">
