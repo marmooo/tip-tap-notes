@@ -24,7 +24,9 @@ import { installIOSTouchGuards } from "/tip-tap-notes/ios-touch-guards.js";
 // 定数
 // ---------------------------------------------------------------------------
 
-const START_DELAY_MIDI = 3; // 秒。midy.startDelay と合わせる（音声モードは0でOK＝後述）
+// MIDI / 音声 共通の開始遅延。ノートが判定ラインに到達する前にスクロールインする
+// リードイン時間。midy.startDelay にも同じ値を渡す。
+const START_DELAY = 3; // 秒
 
 const JUDGMENT_WINDOWS = {
   perfect: 40,
@@ -196,6 +198,13 @@ let notesStale = true; // 音声モード: 設定変更等で再生成が必要�
 let isAnalyzing = false; // 音声モード: 解析中の多重起動防止（gamePhaseとは別管理）
 let suppressPauseHandling = false; // 音声モード: 自前pause()をuser-pauseと誤認しないためのフラグ
 
+// 音声モードの開始遅延（START_DELAY）。MIDI の midy.startDelay に相当。
+// リードイン中は <audio> をまだ再生せず、壁時計でゲーム時刻を -START_DELAY → 0 まで進める。
+// 0 到達時に player.play() してノート時刻と音を同期する。
+let _audioLeadIn = false;
+let _audioLeadInStartPerf = 0;
+let _audioLeadInTimeoutId = null;
+
 let lastResult = {
   score: 0,
   combo: 0,
@@ -299,7 +308,7 @@ function currentGameTime() {
     if (now < _resumeStabilizeMinUntil) {
       return approx;
     }
-    const real = midy.currentTime() - START_DELAY_MIDI;
+    const real = midy.currentTime() - START_DELAY;
     if (
       now < _resumeStabilizeMaxUntil &&
       Math.abs(real - approx) > RESUME_STABILIZE_TOLERANCE_SEC
@@ -308,7 +317,13 @@ function currentGameTime() {
     }
     return real;
   }
-  return player.currentTime; // 音声モードはネイティブ<audio>の再生位置をそのまま使う
+  // 音声モード: リードイン中は壁時計で -START_DELAY → 0 を進め、
+  // 再生開始後は <audio> の再生位置をそのまま使う（ノート時刻と一致）。
+  if (_audioLeadIn) {
+    if (isPaused) return _pausedAt;
+    return (performance.now() - _audioLeadInStartPerf) / 1000 - START_DELAY;
+  }
+  return player.currentTime;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +380,7 @@ function buildWorkerOptions() {
     },
     difficulty: DIFFICULTIES[config.difficulty] ?? DIFFICULTIES.NORMAL,
     judgeOffset: (config.judgeOffset ?? 0) / 1000,
-    startDelay: mode === "midi" ? START_DELAY_MIDI : 0,
+    startDelay: START_DELAY,
     laneOpacity: config.laneOpacity ?? 0.35,
     buttonZoneHeight: Math.round(h * 0.2),
     perspective: (config.perspectiveEnabled ?? true) ? PERSPECTIVE : 0,
@@ -864,6 +879,7 @@ function showResult() {
     clearTimeout(endingFadeTimeoutId);
     endingFadeTimeoutId = null;
   }
+  clearAudioLeadIn();
   // stop で描画ループ・アクティブ判定を止める。
   // 譜面配列自体は Worker に残し、リプレイ時の setNotes 再送（structured clone）を
   // 避ける。高負荷 MIDI ではこの clone がピークメモリを押し上げる一因になる。
@@ -1379,6 +1395,21 @@ function updatePauseUi(paused) {
   btnPause.innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
 }
 
+function scheduleAudioLeadInEnd(remainingSec) {
+  if (_audioLeadInTimeoutId !== null) {
+    clearTimeout(_audioLeadInTimeoutId);
+    _audioLeadInTimeoutId = null;
+  }
+  const ms = Math.max(0, remainingSec * 1000);
+  _audioLeadInTimeoutId = setTimeout(() => {
+    _audioLeadInTimeoutId = null;
+    if (gamePhase !== "playing" || isPaused || !_audioLeadIn) return;
+    _audioLeadIn = false;
+    player.currentTime = 0;
+    player.play().catch((err) => console.error("player.play failed:", err));
+  }, ms);
+}
+
 function togglePause() {
   if (gamePhase !== "playing") return;
   if (mode === "midi") {
@@ -1395,6 +1426,26 @@ function togglePause() {
       console.error("midy.pause/resume failed:", err);
     }
   } else if (mode === "audio") {
+    // リードイン中は <audio> がまだ動いていないので、壁時計ベースで一時停止/再開する。
+    if (_audioLeadIn) {
+      if (isPaused) {
+        // 再開: 停止時点のゲーム時刻から残りリードインを再開
+        _audioLeadInStartPerf = performance.now() -
+          (_pausedAt + START_DELAY) * 1000;
+        updatePauseUi(false);
+        startRaf();
+        scheduleAudioLeadInEnd(Math.max(0, -_pausedAt));
+      } else {
+        _pausedAt = currentGameTime();
+        if (_audioLeadInTimeoutId !== null) {
+          clearTimeout(_audioLeadInTimeoutId);
+          _audioLeadInTimeoutId = null;
+        }
+        stopRaf();
+        updatePauseUi(true);
+      }
+      return;
+    }
     if (player.paused) {
       player.play().catch((err) => console.error("player.play failed:", err));
     } else {
@@ -1408,6 +1459,14 @@ btnPause.addEventListener("click", togglePause);
 // モード切り替え
 // ---------------------------------------------------------------------------
 
+function clearAudioLeadIn() {
+  _audioLeadIn = false;
+  if (_audioLeadInTimeoutId !== null) {
+    clearTimeout(_audioLeadInTimeoutId);
+    _audioLeadInTimeoutId = null;
+  }
+}
+
 function stopAllPlayback() {
   stopRaf();
   if (endingFadeTimeoutId !== null) {
@@ -1415,6 +1474,7 @@ function stopAllPlayback() {
     endingFadeTimeoutId = null;
   }
   endingFadeStarted = false;
+  clearAudioLeadIn();
   try {
     if (!midy.isPaused) midy.pause();
   } catch (err) {
@@ -1456,7 +1516,7 @@ function switchMode(next) {
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
 midy.cacheMode = "chunk";
-midy.startDelay = START_DELAY_MIDI;
+midy.startDelay = START_DELAY;
 
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";
 // 現在選択中のサウンドフォントのベースURL（ディレクトリ）。
@@ -1942,7 +2002,7 @@ midy.addEventListener("seeked", () => {
   lastResult = { ...lastResult, score: 0, combo: 0 };
   worker.postMessage({
     type: "tick",
-    currentTime: midy.resumeTime - START_DELAY_MIDI,
+    currentTime: midy.resumeTime - START_DELAY,
   });
 });
 
@@ -2101,15 +2161,56 @@ async function loadAudioFile(file) {
   showScreen("ready");
 }
 
+/** 音声モードの1プレイ開始。START_DELAY 秒のリードイン後に <audio> を再生する。 */
+function beginAudioRound() {
+  clearAudioLeadIn();
+  // 自前の pause を user-pause と誤認しない
+  if (!player.paused) {
+    suppressPauseHandling = true;
+    player.pause();
+  }
+  player.currentTime = 0;
+  player.volume = 1;
+  _audioLeadIn = true;
+  _audioLeadInStartPerf = performance.now();
+  if (gamePhase === "playing") {
+    // リプレイ: 既に playing のままリセット
+    endingFadeStarted = false;
+    endingFadeStartPerf = 0;
+    if (endingFadeTimeoutId !== null) {
+      clearTimeout(endingFadeTimeoutId);
+      endingFadeTimeoutId = null;
+    }
+    lastResult = {
+      score: 0,
+      combo: 0,
+      perfect: 0,
+      great: 0,
+      good: 0,
+      miss: 0,
+      total: laneNotes.length,
+    };
+    worker?.postMessage({ type: "start" });
+    isPaused = false;
+    pauseOverlay.classList.add("hidden");
+    btnPause.classList.remove("hidden");
+    btnPause.innerHTML = ICON_PAUSE;
+    startRaf();
+    uiCanvas.focus({ preventScroll: true });
+  } else {
+    beginPlayback();
+  }
+  scheduleAudioLeadInEnd(START_DELAY);
+}
+
 async function analyzeThenPlay() {
   isAnalyzing = true;
   try {
     buildGame();
     showScreen("analyzing");
     await analyze();
-    isAnalyzing = false; // ここで解除してから再度play()しないと自分自身のガードで弾かれる
-    player.currentTime = 0;
-    await player.play();
+    isAnalyzing = false; // ここで解除してから開始しないと自分自身のガードで弾かれる
+    beginAudioRound();
   } catch (err) {
     isAnalyzing = false;
     console.error(err);
@@ -2137,6 +2238,8 @@ player.addEventListener("play", () => {
   }
 
   if (gamePhase === "playing") {
+    // リードイン完了による play、または一時停止からの再開
+    if (_audioLeadIn) _audioLeadIn = false;
     updatePauseUi(false);
     startRaf();
     uiCanvas.focus({ preventScroll: true });
@@ -2166,8 +2269,8 @@ player.addEventListener("ended", () => {
 });
 
 // 準備完了画面中央の「スタート」ボタン、およびリザルト画面の「もう一度プレイ」ボタン。
-// 音声モードはネイティブ <audio> の play()。MIDIモードは startMidiPlayback()
-// （split soundfont の読み込み → midy.start()）を直接呼ぶ。
+// 音声モードは beginAudioRound()（START_DELAY リードイン後に play）。
+// MIDIモードは startMidiPlayback()（split soundfont の読み込み → midy.start()）。
 
 async function startOrReplay() {
   try {
@@ -2176,8 +2279,11 @@ async function startOrReplay() {
     console.error("audioContext.resume failed:", err);
   }
   if (mode === "audio") {
-    player.currentTime = 0;
-    player.play().catch((err) => console.error("player.play failed:", err));
+    if (notesStale || !notesReady) {
+      await analyzeThenPlay();
+    } else {
+      beginAudioRound();
+    }
   } else if (mode === "midi") {
     try {
       await startMidiPlayback();
