@@ -1636,7 +1636,14 @@ export class RhythmGame {
       ctx.shadowColor = textColor;
       ctx.shadowBlur = o.glow ? 12 * d : 0;
       ctx.textAlign = "center";
-      drawText(ctx, `${this.#combo} COMBO`, W / 2, H * 0.10, textColor);
+      // topInset（navbar + 狭い画面の attribution）より下に出す
+      drawText(
+        ctx,
+        `${this.#combo} COMBO`,
+        W / 2,
+        Math.max(H * 0.14, (o.topInset || 0) + 40 * d),
+        textColor,
+      );
       ctx.shadowBlur = 0;
     }
 

@@ -234,6 +234,8 @@ function setWrapHeight() {
   // 「プレイ中と同じ画面いっぱいのサイズ」（フッター分だけ差し引く）に固定する。
   canvasWrap.style.height = Math.max(300, globalThis.innerHeight - footerH) +
     "px";
+  // 狭い画面では attribution の高さぶん pause / スコアを下げる（--attr-h）
+  syncAttributionStackHeight();
   resizeCanvases();
 }
 globalThis.addEventListener("resize", setWrapHeight);
@@ -317,9 +319,31 @@ function currentGameTime() {
 // 側で右上 HUD（スコア等）を描くときに、navbar の高さぶんだけ避けないと
 // 🌓（ダークモード切替）ボタンと重なってしまう。canvas は dpr 込みの
 // 座標系なので dpr を掛けて渡す。
+// 狭い画面で attribution を pause/スコアの上に積むときは --attr-h も加算する。
 function computeTopInset() {
   const topbarH = document.getElementById("topnav")?.offsetHeight ?? 0;
-  return Math.round(topbarH * dpr);
+  const attrH = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--attr-h"),
+  ) || 0;
+  return Math.round((topbarH + attrH) * dpr);
+}
+
+/** 狭い画面で attribution 表示中だけ、その高さぶん pause / HUD を下げる。
+ *  --attr-h を更新するだけ。Worker への反映は resizeCanvases() 側。 */
+function syncAttributionStackHeight() {
+  const root = document.getElementById("trackAttribution");
+  const narrow = globalThis.matchMedia(
+    "(max-width: 576px), (max-height: 420px)",
+  ).matches;
+  let attrH = 0;
+  if (
+    narrow && root && !root.classList.contains("hidden") &&
+    root.offsetParent !== null
+  ) {
+    // attribution 本体 + わずかな隙間
+    attrH = Math.ceil(root.getBoundingClientRect().height) + 4;
+  }
+  document.documentElement.style.setProperty("--attr-h", attrH + "px");
 }
 
 function buildWorkerOptions() {
@@ -705,6 +729,7 @@ function beginPlayback() {
   btnPause.classList.remove("hidden");
   btnPause.innerHTML = ICON_PAUSE;
   setWrapHeight(); // gamePhase="playing" になったので、ここでキャンバスを画面いっぱいに広げる
+  updateTrackAttributionUI();
   startRaf();
   uiCanvas.focus({ preventScroll: true });
 }
@@ -828,6 +853,7 @@ function showScreen(name) {
   pauseOverlay.classList.add("hidden");
   btnPause.classList.add("hidden");
   setWrapHeight(); // gamePhase が変わったので、フルスクリーン⇄通常レイアウトを再計算する
+  updateTrackAttributionUI();
 }
 
 function showResult() {
@@ -1189,6 +1215,7 @@ document.getElementById("btnResetLaneLineColor")?.addEventListener(
 function goToStartScreen() {
   if (gamePhase === "playing") stopRaf();
   stopAllPlayback();
+  clearTrackMeta();
   showScreen("start");
 }
 document.getElementById("btnChangeFileReady").addEventListener(
@@ -1414,6 +1441,7 @@ function switchMode(next) {
   notesPostedToWorker = false;
   notesReady = false;
   notesStale = true;
+  clearTrackMeta();
   buildGame();
   showScreen("start");
   setTimeout(setWrapHeight, 30);
@@ -1501,13 +1529,15 @@ async function startMidiPlayback() {
   midiHasStartedOnce = true;
 }
 
-async function loadMIDIBytes(bytes) {
+async function loadMIDIBytes(bytes, meta = null) {
   switchMode("midi");
   await ensureMidiStopped();
   await midy.loadMIDI(bytes);
   rawNotes = extractNotesFromMidy(midy);
   lastApplyKey = "";
   notesPostedToWorker = false;
+  // switchMode() が clearTrackMeta() するので、MIDI 読込後に改めて設定する
+  setTrackMeta(meta);
   buildGame();
   applyNotes(true);
   updatePlayLengthLabels();
@@ -1551,7 +1581,8 @@ async function loadFile(file) {
   }
   if (kind === "midi") {
     const buf = await file.arrayBuffer();
-    await loadMIDIBytes(new Uint8Array(buf));
+    // ローカル MIDI にはライブラリ由来の著作権情報がない（ファイル名のみ表示しない）
+    await loadMIDIBytes(new Uint8Array(buf), null);
     return;
   }
   if (kind === "audio") {
@@ -1613,11 +1644,185 @@ const midiLibrary = new MidiLibrary({
   onSelect: async (row) => {
     const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
       .arrayBuffer();
-    await loadMIDIBytes(new Uint8Array(buf));
+    await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
     libraryModal.hide();
   },
 });
 midiLibrary.load();
+
+// ---------------------------------------------------------------------------
+// 楽曲メタデータ（タイトル / 作者 / サイト / ライセンス）表示
+// MIDI ライブラリ由来の曲で著作権表示を満たすために、ready / playing / result
+// の間は画面上部に表示する。ローカルファイル読込時はクリアする。
+// ---------------------------------------------------------------------------
+
+/** @type {{ title: string, composer: string, siteName: string, web: string, license: string } | null} */
+let currentTrackMeta = null;
+
+function isProbablyUrl(s) {
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** MIDI ライブラリ行 + コレクション情報から表示用メタデータを組み立てる */
+function trackMetaFromLibraryRow(row) {
+  if (!row) return null;
+  const collectionId = String(row.file || "").split("/")[0] || "";
+  const col = collectionId ? midiLibrary.collections.get(collectionId) : null;
+  const web = row.web || col?.web || "";
+  const siteName = row.collection || col?.name || collectionId || "";
+  const license = row.license || col?.license || "";
+  const title = row.title || "";
+  const composer = row.composer || col?.composer || "";
+  if (!title && !composer && !siteName && !license) return null;
+  return { title, composer, siteName, web, license };
+}
+
+function clearTrackMeta() {
+  currentTrackMeta = null;
+  updateTrackAttributionUI();
+}
+
+function setTrackMeta(meta) {
+  currentTrackMeta = meta && (meta.title || meta.composer || meta.siteName ||
+      meta.license)
+    ? {
+      title: meta.title || "",
+      composer: meta.composer || "",
+      siteName: meta.siteName || "",
+      web: meta.web || "",
+      license: meta.license || "",
+    }
+    : null;
+  updateTrackAttributionUI();
+}
+
+function updateTrackAttributionUI() {
+  const root = document.getElementById("trackAttribution");
+  const titleEl = document.getElementById("trackAttrTitle");
+  const metaEl = document.getElementById("trackAttrMeta");
+  if (!root || !titleEl || !metaEl) return;
+
+  const meta = currentTrackMeta;
+  // スタート画面では隠す。ready / playing / result / analyzing で表示
+  const visible = !!meta && gamePhase !== "start";
+  root.classList.toggle("hidden", !visible);
+  if (!meta) {
+    titleEl.textContent = "";
+    metaEl.innerHTML = "";
+    syncAttributionStackHeight();
+    if (worker) resizeCanvases();
+    return;
+  }
+
+  titleEl.textContent = meta.title || "Untitled";
+
+  const parts = [];
+  if (meta.composer) {
+    parts.push(`<span>${escapeHtml(meta.composer)}</span>`);
+  }
+  if (meta.web && isProbablyUrl(meta.web)) {
+    const label = escapeHtml(meta.siteName || meta.web);
+    parts.push(
+      `<span class="sep"><a href="${
+        escapeHtml(meta.web)
+      }" target="_blank" rel="noopener noreferrer">${label}</a></span>`,
+    );
+  } else if (meta.siteName) {
+    parts.push(`<span class="sep">${escapeHtml(meta.siteName)}</span>`);
+  }
+  if (meta.license) {
+    if (isProbablyUrl(meta.license)) {
+      parts.push(
+        `<span class="sep"><a href="${
+          escapeHtml(meta.license)
+        }" target="_blank" rel="noopener noreferrer">License</a></span>`,
+      );
+    } else {
+      parts.push(`<span class="sep">${escapeHtml(meta.license)}</span>`);
+    }
+  }
+  metaEl.innerHTML = parts.join("");
+  // 表示後に高さを測って狭い画面の pause/スコア位置を更新し、HUD にも反映
+  syncAttributionStackHeight();
+  if (worker) resizeCanvases();
+}
+
+// ---------------------------------------------------------------------------
+// 結果画面: MIDI ライブラリから 1 分以上の楽曲をランダム選曲
+// ---------------------------------------------------------------------------
+
+/** "M:SS" / "H:MM:SS" / 秒数 を秒に変換。パース不可は 0。 */
+function parseMidiLibraryTime(timeStr) {
+  if (timeStr == null || timeStr === "") return 0;
+  if (typeof timeStr === "number" && Number.isFinite(timeStr)) return timeStr;
+  const s = String(timeStr).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+  const parts = s.split(":").map((p) => Number(p));
+  if (parts.some((n) => !Number.isFinite(n))) return 0;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return 0;
+}
+
+const RANDOM_MIDI_MIN_SECONDS = 60;
+
+async function playRandomLongMidi() {
+  const btn = document.getElementById("btnRandomMidi");
+  const data = midiLibrary.fullData;
+  if (!data || data.length === 0) {
+    alert("MIDI library is still loading. Please try again in a moment.");
+    return;
+  }
+  const candidates = data.filter(
+    (row) =>
+      row?.file && parseMidiLibraryTime(row.time) >= RANDOM_MIDI_MIN_SECONDS,
+  );
+  if (candidates.length === 0) {
+    alert("No songs longer than 1 minute found in the MIDI library.");
+    return;
+  }
+  const row = candidates[Math.floor(Math.random() * candidates.length)];
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Loading…";
+  }
+  try {
+    const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
+      .arrayBuffer();
+    await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
+  } catch (err) {
+    console.error("Random MIDI load failed:", err);
+    alert("Failed to load random MIDI: " + (err?.message || err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🎲 Random MIDI (≥1 min)";
+    }
+  }
+}
+
+document.getElementById("btnRandomMidi")?.addEventListener(
+  "click",
+  () => {
+    playRandomLongMidi().catch((err) =>
+      console.error("playRandomLongMidi failed:", err)
+    );
+  },
+);
 
 // ---------------------------------------------------------------------------
 // SoundFont library（Bootstrap modal 内の一覧から選択。ラジオボタンなので
@@ -1885,6 +2090,8 @@ async function loadAudioFile(file) {
   notesReady = false;
   notesStale = true;
   rawNotes = [];
+  // ローカル音声にはライブラリ由来の著作権情報がない
+  clearTrackMeta();
   buildGame();
   updatePlayLengthLabels();
   showScreen("ready");
