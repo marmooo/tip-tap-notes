@@ -110,6 +110,60 @@
         pointer-events: none; touch-action: none;
       }
       #uiCanvas { pointer-events: auto; outline: none; }
+
+      /* トラック帰属表示（タイトル / 作曲者 / サイト / ライセンス）。ready / playing / result 中に表示。
+         常に #topnav の下（ナビバー上や中には被らない）。広い画面では左右余白を取り
+           一時停止ボタン・スコア行と横並び。狭い画面ではその上に積み上げ、
+         --attr-h で一時停止とキャンバスHUDを下げる（JS側で設定）。 */
+      #trackAttribution {
+        position: absolute;
+        top: calc(var(--topbar-h, 48px) + 0.2rem);
+        left: 3.6rem;   /* ≈ pause button (2.4rem) + left:10px + gap */
+        right: 6.5rem;  /* score HUD (~7 digits + padding) */
+        z-index: 6;
+        padding: 0.2rem 0.45rem;
+        border-radius: 0.4rem;
+        text-align: center;
+        pointer-events: none;
+        background: color-mix(in srgb, var(--bs-body-bg) 38%, transparent);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        box-shadow: none;
+        line-height: 1.2;
+      }
+      #trackAttribution.hidden { display: none !important; }
+      #trackAttribution a {
+        pointer-events: auto;
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      #trackAttrTitle {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #trackAttrMeta {
+        color: var(--bs-secondary-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #trackAttrMeta .sep::before {
+        content: " · ";
+        opacity: 0.7;
+      }
+      /* 狭い・低い画面: ナビ直下の全幅バー。一時停止・スコアは --attr-h で下へずらす */
+      @media (max-width: 576px), (max-height: 420px) {
+        #trackAttribution {
+          left: 0.5rem;
+          right: 0.5rem;
+          padding: 0.15rem 0.4rem;
+          background: color-mix(in srgb, var(--bs-body-bg) 32%, transparent);
+        }
+      }
+
       #canvasWrap {
         position: relative; overflow: hidden;
         background-color: var(--bs-body-bg);
@@ -474,6 +528,12 @@
           </svg>
         </button>
 
+        <!-- MIDIライブラリ作品のトラック帰属表示（タイトル / 作曲者 / サイト / ライセンス） -->
+        <div id="trackAttribution" class="small hidden" aria-live="polite">
+          <div id="trackAttrTitle"></div>
+          <div id="trackAttrMeta"></div>
+        </div>
+
         <!-- 一時停止中の表示（プレイ中のみ btnPause から表示/非表示を切り替え） -->
         <div id="pauseOverlay" class="hidden"
              style="position:absolute; inset:0; z-index:4; display:flex;
@@ -613,6 +673,13 @@
               ▶ もう一度プレイ
             </button>
             <p class="small text-muted mt-2 mb-0">スペースキーでもリプレイできます</p>
+            <div class="mt-3">
+              <button id="btnRandomMidi" type="button"
+                      class="btn btn-outline-info rounded-pill fw-bold px-3 py-2">
+                🎲 ランダムMIDI（1分以上）
+              </button>
+              <p class="small text-muted mt-1 mb-0">MIDIライブラリから1分以上の曲をランダムに選ぶ</p>
+            </div>
             <div>
               <button id="btnChangeFileResult" type="button"
                       class="btn btn-sm btn-link text-muted mt-2">📂 スタート画面に戻る</button>

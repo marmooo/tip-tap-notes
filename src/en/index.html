@@ -110,6 +110,60 @@
         pointer-events: none; touch-action: none;
       }
       #uiCanvas { pointer-events: auto; outline: none; }
+
+      /* Track attribution (title / composer / site / license) while ready/playing/result.
+         Always under #topnav (never above/into the navbar). On wide screens it shares
+         the pause/score row with side insets; on narrow screens it stacks above them
+         and --attr-h pushes pause + canvas HUD down (set in JS). */
+      #trackAttribution {
+        position: absolute;
+        top: calc(var(--topbar-h, 48px) + 0.2rem);
+        left: 3.6rem;   /* ≈ pause button (2.4rem) + left:10px + gap */
+        right: 6.5rem;  /* score HUD (~7 digits + padding) */
+        z-index: 6;
+        padding: 0.2rem 0.45rem;
+        border-radius: 0.4rem;
+        text-align: center;
+        pointer-events: none;
+        background: color-mix(in srgb, var(--bs-body-bg) 38%, transparent);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        box-shadow: none;
+        line-height: 1.2;
+      }
+      #trackAttribution.hidden { display: none !important; }
+      #trackAttribution a {
+        pointer-events: auto;
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      #trackAttrTitle {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #trackAttrMeta {
+        color: var(--bs-secondary-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #trackAttrMeta .sep::before {
+        content: " · ";
+        opacity: 0.7;
+      }
+      /* Narrow / short: full-width bar just under navbar; pause/score shift down via --attr-h */
+      @media (max-width: 576px), (max-height: 420px) {
+        #trackAttribution {
+          left: 0.5rem;
+          right: 0.5rem;
+          padding: 0.15rem 0.4rem;
+          background: color-mix(in srgb, var(--bs-body-bg) 32%, transparent);
+        }
+      }
+
       #canvasWrap {
         position: relative; overflow: hidden;
         background-color: var(--bs-body-bg);
@@ -454,7 +508,7 @@
         <button id="btnPause" type="button" title="Space to pause/resume"
                 class="btn btn-sm btn-secondary rounded-circle hidden
                        d-flex align-items-center justify-content-center"
-                style="position:absolute; top:calc(var(--topbar-h, 0px));
+                style="position:absolute; top:calc(var(--topbar-h, 0px) + var(--attr-h, 0px));
                        left:10px; z-index:5;
                        width:2.4rem; height:2.4rem; padding:0;">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -462,6 +516,12 @@
             <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
           </svg>
         </button>
+
+        <!-- Track attribution for MIDI library works (title / composer / site / license) -->
+        <div id="trackAttribution" class="small hidden" aria-live="polite">
+          <div id="trackAttrTitle"></div>
+          <div id="trackAttrMeta"></div>
+        </div>
 
         <!-- Pause overlay (shown/hidden from btnPause only while playing) -->
         <div id="pauseOverlay" class="hidden"
@@ -602,6 +662,13 @@
               ▶ Play again
             </button>
             <p class="small text-muted mt-2 mb-0">You can also replay with the Space key</p>
+            <div class="mt-3">
+              <button id="btnRandomMidi" type="button"
+                      class="btn btn-outline-info rounded-pill fw-bold px-3 py-2">
+                🎲 Random MIDI (≥1 min)
+              </button>
+              <p class="small text-muted mt-1 mb-0">Pick a random song over 1 minute from the MIDI library</p>
+            </div>
             <div>
               <button id="btnChangeFileResult" type="button"
                       class="btn btn-sm btn-link text-muted mt-2">📂 Back to start screen</button>
