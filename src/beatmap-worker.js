@@ -85,7 +85,7 @@ function computeOnsetEnvelopeParallel(
     let completed = 0;
     let win = null, twiddles = null;
     const workers = ranges.map(() =>
-      new Worker("./stft-chunk-worker.js", { type: "module" })
+      new Worker("/tip-tap-notes/stft-chunk-worker.js", { type: "module" })
     );
 
     function cleanup() {

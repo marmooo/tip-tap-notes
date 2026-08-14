@@ -81,7 +81,7 @@ const DEFAULT_CONFIG = {
   accentColor: "", // "" = 未設定（currentColor に自動追従。テーマ切替でも見えなくならない）
   judgeLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
   laneLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
-  backgroundPreset: "./data/japan-sky.webp", // 初期値はJapan Sky。""=なし / プリセットURL / "custom"（本体は IndexedDB に保存）
+  backgroundPreset: "/tip-tap-notes/data/japan-sky.webp", // 初期値はJapan Sky。""=なし / プリセットURL / "custom"（本体は IndexedDB に保存）
   // Canvas 解像度の上限（devicePixelRatio をこの値でキャップ）。
   // 既定 1 = 負荷を抑えて安定優先。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
   maxPixelRatio: 1,
@@ -398,7 +398,9 @@ function initWorker() {
   notesPostedToWorker = false;
   replaceCanvases();
 
-  worker = new Worker("./rhythm-game-worker.js", { type: "module" });
+  worker = new Worker("/tip-tap-notes/rhythm-game-worker.js", {
+    type: "module",
+  });
   worker.onmessage = onWorkerMessage;
   // Worker が落ちた場合は参照を捨て、次回 ensureWorker / startGameMidi で
   // 再構築できるようにする（null のまま残すとリプレイが永久に動かなくなる）。
@@ -2047,7 +2049,9 @@ function analyze() {
 
 function initBeatWorker() {
   if (beatWorker) beatWorker.terminate();
-  beatWorker = new Worker("./beatmap-worker.js", { type: "module" });
+  beatWorker = new Worker("/tip-tap-notes/beatmap-worker.js", {
+    type: "module",
+  });
   beatWorker.onmessage = (e) => {
     const msg = e.data;
     if (msg.type === "progress") {
