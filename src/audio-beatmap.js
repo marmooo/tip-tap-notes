@@ -4,10 +4,12 @@
  * 音声ファイル(PCM)から音ゲー用の譜面(ノート配列)を自動生成する。
  *
  * 方針（音高推定はしない）：
- *   1. いつ鳴ったか   … Onset Detection (Spectral Flux)
+ *   1. いつ鳴ったか   … Onset Detection (帯域別 Spectral Flux)
  *   2. どのくらい強いか … Energy Detection (RMS)
  *   3. テンポ         … Beat Tracking (自己相関 + 位相同期ループ)
  *   4. どの音域か     … Spectral Centroid（レーン分散の補助情報。おまけ）
+ *   5. 疎区間補完     … エネルギーはあるがオンセットが無い拍に合成ノート
+ *                        （小さめ・長い持続音の間奏向け）
  *
  * 出力ノートは extractNotesFromMidy() と同じ形 { noteNumber, startTime,
  * endTime, channel, programNumber } にしてあるので、rhythm-game.js の
@@ -668,6 +670,102 @@ export function filterByStrength(onsets, keepRatio) {
 }
 
 // ---------------------------------------------------------------------------
+// 疎区間の拍グリッド補完
+// ---------------------------------------------------------------------------
+// Spectral Flux は「急な立ち上がり」しか拾えないため、小さめ・長い持続音の
+// 間奏ではオンセットがほぼ無くなる。一方テンポ推定で拍位置は取れているので、
+// 「エネルギーはあるがオンセットが無い拍」に合成オンセットを足す。
+// 完全無音（エネルギー低）は触らない。コストは拍数に比例（曲長数秒〜数百）で軽い。
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {{ frame:number, time:number, strength:number }[]} onsets 既存オンセット（強度間引き後）
+ * @param {number[]} beatTimes trackBeats の拍時刻
+ * @param {Float64Array} energy 正規化済みフレームエネルギー (0..1)
+ * @param {Float64Array} frameTimes
+ * @param {object} opts { energyThresh, everyNBeats, coverTol, synthStrength }
+ * @returns {{ frame:number, time:number, strength:number, synthetic?:boolean }[]}
+ */
+export function fillSparseBeats(
+  onsets,
+  beatTimes,
+  energy,
+  frameTimes,
+  opts = {},
+) {
+  if (!beatTimes.length) return onsets.slice();
+
+  const energyThresh = opts.energyThresh ?? 0.10;
+  const everyN = Math.max(1, opts.everyNBeats ?? 1);
+  // この近傍に既存オンセットがあれば「カバー済み」とみなす
+  const coverTol = opts.coverTol ?? 0.09;
+  const synthStrength = opts.synthStrength ?? 0.38;
+
+  const existing = onsets.slice().sort((a, b) => a.time - b.time);
+  const nFrames = frameTimes.length;
+  if (nFrames === 0) return existing;
+
+  function frameAt(t) {
+    let lo = 0, hi = nFrames - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (frameTimes[mid] < t) lo = mid + 1;
+      else hi = mid;
+    }
+    if (
+      lo > 0 &&
+      Math.abs(frameTimes[lo - 1] - t) < Math.abs(frameTimes[lo] - t)
+    ) {
+      return lo - 1;
+    }
+    return lo;
+  }
+
+  function energyAt(t) {
+    return energy[frameAt(t)] ?? 0;
+  }
+
+  // 既存オンセットは昇順。拍も昇順なのでポインタを進めるだけで近傍判定できる。
+  let oi = 0;
+  const added = [];
+
+  for (let bi = 0; bi < beatTimes.length; bi += everyN) {
+    const t = beatTimes[bi];
+
+    while (oi < existing.length && existing[oi].time < t - coverTol) oi++;
+    let covered = false;
+    for (
+      let j = oi;
+      j < existing.length && existing[j].time <= t + coverTol;
+      j++
+    ) {
+      covered = true;
+      break;
+    }
+    if (covered) continue;
+    if (energyAt(t) < energyThresh) continue;
+
+    added.push({
+      frame: frameAt(t),
+      time: t,
+      strength: synthStrength,
+      synthetic: true,
+    });
+  }
+
+  if (added.length === 0) return existing;
+  return existing.concat(added).sort((a, b) => a.time - b.time);
+}
+
+/** 難易度ごとの疎区間補完パラメータ */
+const SPARSE_FILL = {
+  EASY: { everyNBeats: 2, energyThresh: 0.14, synthStrength: 0.32 },
+  BASIC: { everyNBeats: 2, energyThresh: 0.12, synthStrength: 0.35 },
+  NORMAL: { everyNBeats: 1, energyThresh: 0.10, synthStrength: 0.38 },
+  HARD: { everyNBeats: 1, energyThresh: 0.08, synthStrength: 0.42 },
+};
+
+// ---------------------------------------------------------------------------
 // 音域(スペクトル重心) → 疑似ノート番号（レーン分散用。音程精度は問わない）
 // ---------------------------------------------------------------------------
 
@@ -777,11 +875,21 @@ export function beatmapFromEnvelope(env, samples, sampleRate, options = {}) {
   const grid = buildBeatGrid(beatTimes, cfg.subdivisions);
   const snapped = snapToGrid(rawOnsets, grid);
   const filtered = filterByStrength(snapped, cfg.keepRatio);
+  // 強度間引き後に補完する（本物の強いオンセットを押し出さない）。
+  // エネルギーがあるのにオンセットが無い拍（小さめ持続音の間奏など）を埋める。
+  const fillOpts = SPARSE_FILL[difficulty] ?? SPARSE_FILL.NORMAL;
+  const filled = fillSparseBeats(
+    filtered,
+    beatTimes,
+    env.energy,
+    env.frameTimes,
+    fillOpts,
+  );
 
   onProgress({ stage: "notes", progress: 0.90 });
   // スペクトル重心は最終的に採用されたノートの分だけ遅延計算する
   // （全フレームぶん求めていた旧実装より計算量が大幅に少ない）
-  for (const o of filtered) {
+  for (const o of filled) {
     o.centroidHz = computeFrameCentroid(
       samples,
       sampleRate,
@@ -793,7 +901,7 @@ export function beatmapFromEnvelope(env, samples, sampleRate, options = {}) {
     );
   }
   const notes = buildNotes(
-    filtered,
+    filled,
     env.energy,
     env.frameTimes,
     cfg.sustainEnabled,
