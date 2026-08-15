@@ -197,6 +197,14 @@ let notesReady = false; // 音声モード: 現在の設定で譜面生成済み
 let notesStale = true; // 音声モード: 設定変更等で再生成が必要か
 let isAnalyzing = false; // 音声モード: 解析中の多重起動防止（gamePhaseとは別管理）
 let suppressPauseHandling = false; // 音声モード: 自前pause()をuser-pauseと誤認しないためのフラグ
+// MIDI: ユーザーがトグルした一時停止だけ paused ハンドラで UI/rAF を止める。
+// SHORT終了・stopAllPlayback のシステム pause は立てない。
+let userInitiatedMidiPause = false;
+// completeShortEnding() / ORIGINAL自然終了時の systemPauseMidi() が進行中なら、
+// その Promise を保持する。startMidiPlayback() はこれを待ってから
+// midy.isPaused を見ることで、「pause() 完了前に isPaused=false を見て
+// 誤って stop+start フォールバックに落ちる」競合を無くす。
+let systemPausePromise = null;
 
 // 音声モードの開始遅延（START_DELAY）。MIDI の midy.startDelay に相当。
 // リードイン中は <audio> をまだ再生せず、壁時計でゲーム時刻を -START_DELAY → 0 まで進める。
@@ -490,27 +498,22 @@ function onWorkerMessage(e) {
       lastResult.total = msg.count;
       break;
     case "ended": {
-      // ORIGINAL: ノート消化で終了 → 即スコア画面
-      // SHORT: 長い曲を 120s で切る場合は handleShortEnding に任せる。
-      //        曲自体が SHORT_DURATION 以下でも、即 showResult せず
-      //        maxDuration を現在時刻に揃えて handleShortEnding の
-      //        フェード（ENDING_FADE_DURATION 秒）を経由してから終了する。
-      //        （ノート消化時点の t が maxDuration にわずかに届かない／
-      //         再生側が止まって t が進まないケースでもフェードを開始できる）
-      //        バックグラウンドでは rAF が止まるため、ここで即 handleShortEnding
-      //        を呼んで setTimeout による完了保証を仕掛ける。
+      // maxDuration === Infinity（ORIGINAL、または実尺 ≤ SHORT の SHORT）:
+      //   ノート消化＝自然終了 → スコア画面。MIDI は systemPause で paused に
+      //   収束させ、リプレイは seekTo(0)+resume() で再開できる。
+      // maxDuration 有限（実尺 > SHORT の SHORT）:
+      //   120s 強制終了用のフェードへ。ノート消化が先に来た場合も同様。
       if (gamePhase !== "playing") break;
       if (maxDuration === Infinity) {
         stopRaf();
         showResult();
+        if (mode === "midi") systemPauseMidi();
+      } else if (currentGameTime() >= maxDuration - 0.1) {
+        maxDuration = Math.min(maxDuration, currentGameTime());
+        handleShortEnding(currentGameTime());
       } else {
-        const songDuration = getSongDuration();
-        const isWholeSongShort = songDuration > 0 &&
-          songDuration <= SHORT_DURATION + 0.5;
-        if (isWholeSongShort || currentGameTime() >= maxDuration - 0.1) {
-          maxDuration = Math.min(maxDuration, currentGameTime());
-          handleShortEnding(currentGameTime());
-        }
+        // ノートは尽きたがまだ maxDuration 前 → 残りは無音で時刻だけ進む。
+        // handleShortEnding は gameLogicTick 側の maxDuration 到達で発火する。
       }
       break;
     }
@@ -542,19 +545,19 @@ function getSongDuration() {
 
 function applyNotes(forceResend = false) {
   if (!worker || rawNotes.length === 0) return;
-  // 曲の実尺が SHORT_DURATION 未満の場合、maxDuration を SHORT_DURATION 固定に
-  // してしまうと t が maxDuration に到達せず handleShortEnding() が発火しない
-  // （= フェードアウト/pause/showResult に進めず終了できない）。
-  // 実尺で頭打ちにして、SHORTでも曲が最後まで鳴り切ったタイミングで
-  // 正しく終了処理に入れるようにする。
+  // SHORT は「長い曲を SHORT_DURATION で切る」ためのモード。
+  // 曲の実尺が SHORT_DURATION 以下なら SHORT と ORIGINAL は同じ尺なので、
+  // 強制フェード（handleShortEnding）は使わず自然終了させる。
+  // （実尺付近で fade + systemPause と midy の自然 stopped が重なると、
+  //  リプレイ時に isPaused まわりが不安定になるため）
   if (playLength === "short") {
-    // MIDI / 音声どちらも getSongDuration() で実尺を取る。
-    // 以前は音声モードで 0 固定だったため、曲が SHORT_DURATION 未満だと
-    // maxDuration が 120 のままになり handleShortEnding() が発火しなかった。
     const songDuration = getSongDuration();
-    maxDuration = songDuration > 0
-      ? Math.min(SHORT_DURATION, songDuration)
-      : SHORT_DURATION;
+    if (songDuration > 0 && songDuration <= SHORT_DURATION) {
+      maxDuration = Infinity;
+    } else {
+      // 実尺不明 or SHORT より長い → 120 秒で切る
+      maxDuration = SHORT_DURATION;
+    }
   } else {
     maxDuration = Infinity;
   }
@@ -653,6 +656,25 @@ function stopRaf() {
 // さらに、タブがバックグラウンドのときは requestAnimationFrame が停止するため、
 // フェード開始時に setTimeout でも完了を予約し、音楽が裏で鳴り続けていても
 // 確実にスコア画面へ遷移させる。
+// gamePhase を "result" にした直後、mode==="midi" のときに呼ぶ。
+// SHORT のフェード終了・ORIGINAL の自然終了（ノート消化）いずれの経路でも、
+// midy を確実に paused 状態へ収束させる（seekTo(0) 等の後始末は既存の
+// midy "paused" イベントリスナーが gamePhase==="result" を見て行う）。
+// startMidiPlayback() 側は systemPausePromise を await することで、
+// 「pause() が完了しきる前に isPaused=false を観測してしまう」競合
+// （＝曲の実尺が SHORT_DURATION/ノート消化タイミングと際どく重なる曲で、
+// リプレイ時にゲームが始まらない・スペースキーでようやく動く原因）を避ける。
+// なお pause() は「システム pause」（userInitiatedMidiPause は立てない）。
+function systemPauseMidi() {
+  const promise = midy.pause()
+    .catch((err) => console.error("midy.pause failed:", err))
+    .finally(() => {
+      if (systemPausePromise === promise) systemPausePromise = null;
+    });
+  systemPausePromise = promise;
+  return promise;
+}
+
 function completeShortEnding() {
   if (gamePhase !== "playing") return;
   if (endingFadeTimeoutId !== null) {
@@ -662,8 +684,9 @@ function completeShortEnding() {
   stopRaf();
   showResult();
   if (mode === "midi") {
-    midy.pause().catch((err) => console.error("midy.pause failed:", err));
+    systemPauseMidi();
   } else {
+    suppressPauseHandling = true;
     player.pause();
   }
 }
@@ -741,6 +764,7 @@ function beginPlayback() {
   libraryModal.hide();
   soundFontModal.hide();
   settingsModal.hide();
+  userInitiatedMidiPause = false;
   isPaused = false;
   pauseOverlay.classList.add("hidden");
   btnPause.classList.remove("hidden");
@@ -1420,10 +1444,12 @@ function togglePause() {
           result.catch((err) => console.error("midy.resume failed:", err));
         }
       } else {
+        userInitiatedMidiPause = true;
         midy.pause();
       }
     } catch (err) {
       console.error("midy.pause/resume failed:", err);
+      userInitiatedMidiPause = false;
     }
   } else if (mode === "audio") {
     // リードイン中は <audio> がまだ動いていないので、壁時計ベースで一時停止/再開する。
@@ -1558,11 +1584,35 @@ async function ensureMidiStopped() {
 let midiHasStartedOnce = false;
 
 async function startMidiPlayback() {
+  // completeShortEnding() / ORIGINAL自然終了の systemPauseMidi() がまだ
+  // 進行中なら、まずそれの完了を待つ。ここを待たずに midy.isPaused を見ると、
+  // 「pause() の完了直前（isPlaying/isPaused がまだどちらも false 寄りの
+  // 遷移中）」を誤ってスナップショットしてしまい、以降の分岐が本来と違う
+  // 経路（かつ資源再読み込みを伴う遅い stop+start）に入ってしまう。
+  // これが、曲の実尺が SHORT_DURATION / ノート消化タイミングと際どく重なる
+  // 曲（例: 1:22 の曲）でリプレイ時にゲームが始まらず、スペースキーで
+  // ようやく動くように見えていた不具合の主因だった。
+  if (systemPausePromise) {
+    try {
+      await systemPausePromise;
+    } catch (err) {
+      console.error("pending systemPauseMidi failed:", err);
+    }
+  }
+  userInitiatedMidiPause = false;
+
   // SHORT終了後は pause() で止めているので resume() で先頭から再開できる。
   // キャッシュが保持されているため SoundFont の再読み込みも不要。
-  // ※ これは意図的な高速リプレイ用の分岐なので変更しない。
+  // 上で systemPausePromise を待ち終えているため、ここでの midy.isPaused は
+  // 「pause 完了直後の安定した値」であり、以降の分岐を安心して選べる。
   if (midy.isPaused) {
-    await midy.resume();
+    try {
+      midy.seekTo(0);
+      midy.setMasterVolume(1, audioContext.currentTime);
+      await midy.resume();
+    } catch (err) {
+      console.error("midy.resume failed:", err);
+    }
     return;
   }
   // ORIGINAL 完走時や、曲が SHORT_DURATION 未満で自然終了したときは
@@ -1951,14 +2001,24 @@ midy.addEventListener("started", startGameMidi);
 
 midy.addEventListener("paused", () => {
   if (mode !== "midi") return;
-  stopRaf();
-  _pausedAt = currentGameTime();
-  worker?.postMessage({ type: "tick", currentTime: _pausedAt });
-  if (gamePhase === "playing") {
-    updatePauseUi(true);
-  } else if (gamePhase === "result") {
-    // SHORTモード終了由来の pause。再プレイ時に先頭から再生できるよう
-    // 再生位置を 0 に戻し、フェードアウトした音量も復元しておく。
+  const fromUser = userInitiatedMidiPause;
+  userInitiatedMidiPause = false;
+
+  // ユーザー操作の一時停止だけ stopRaf + 一時停止 UI。
+  // システム pause（SHORT終了など）がリプレイ後に遅延到着しても、
+  // 新プレイの rAF を止めたり isPaused を立てたりしない。
+  if (fromUser) {
+    stopRaf();
+    _pausedAt = currentGameTime();
+    worker?.postMessage({ type: "tick", currentTime: _pausedAt });
+    if (gamePhase === "playing") {
+      updatePauseUi(true);
+    }
+    return;
+  }
+
+  // システム pause: result 中なら先頭へ（completeShortEnding の then と二重でも安全）
+  if (gamePhase === "result") {
     midy.seekTo(0);
     midy.setMasterVolume(1, audioContext.currentTime);
   }
@@ -1966,8 +2026,14 @@ midy.addEventListener("paused", () => {
 
 midy.addEventListener("resumed", () => {
   if (mode !== "midi") return;
+  // 再生開始時は必ず非一時停止 UI に揃える
+  isPaused = false;
+  pauseOverlay.classList.add("hidden");
+  if (btnPause) {
+    btnPause.classList.remove("hidden");
+    btnPause.innerHTML = ICON_PAUSE;
+  }
   if (gamePhase === "playing") {
-    updatePauseUi(false);
     _resumeBaseGameTime = _pausedAt;
     _resumeBasePerf = performance.now();
     _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
@@ -1984,13 +2050,15 @@ midy.addEventListener("stopped", () => {
   // プレイ中の自然終了:
   // - すでにフェード中なら setTimeout / completeShortEnding に完了を任せる
   //   （バックグラウンドで rAF が止まっていてもタイムアウトで showResult される）
-  // - 未フェードなら音楽は既に止まっているのでスコア画面へ
+  // - 未フェードなら音楽は既に止まっているのでスコア画面へ。
+  //   systemPauseMidi() で paused に揃えておき、リプレイは seekTo(0)+resume。
   if (gamePhase === "playing") {
     if (endingFadeStarted) {
       return;
     }
     stopRaf();
     showResult();
+    systemPauseMidi();
   } else {
     stopRaf();
   }
