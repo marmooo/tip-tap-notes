@@ -10,7 +10,7 @@
  * rhythm-game-worker.js での判定/描画）は完全に共通。
  */
 
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.1/dist/midy.min.js";
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.2/dist/midy.min.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
   DIFFICULTIES,
