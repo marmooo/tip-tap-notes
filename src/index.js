@@ -1752,7 +1752,7 @@ const midiLibrary = new MidiLibrary({
   columns: "libraryColumns",
   collections: "libraryCollections",
   instruments: "libraryInstruments",
-  lang: htmlLang,
+  lang: ["ja", "en"].includes(htmlLang) ? htmlLang : "en",
   onSelect: async (row) => {
     const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
       .arrayBuffer();
