@@ -637,39 +637,58 @@
         </div>
 
         <!-- Result screen -->
-        <div id="screenResult" class="overlay hidden">
-          <div class="card p-4 text-center border-secondary-subtle" style="min-width:270px;">
-            <div id="resultGrade" class="grade-badge mb-2"></div>
-            <h3 class="fw-bold mb-3 text-warning-emphasis">RESULT</h3>
-            <table id="resultTable" class="mx-auto mb-3 small">
-              <tr><td class="label">Score</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
-              <tr><td class="label">Accuracy</td> <td id="rAccuracy" class="text-end"></td></tr>
-              <tr><td class="label">Max Combo</td><td id="rCombo"    class="text-end"></td></tr>
-              <tr><td class="label">Perfect</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
-              <tr><td class="label">Great</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
-              <tr><td class="label">Good</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
-              <tr><td class="label">Miss</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
-            </table>
-            <button id="btnBigReplay" type="button"
-                    class="btn btn-primary rounded-pill fw-bold px-4 py-2">
-              ▶ Play again
-            </button>
-            <p class="small text-muted mt-2 mb-0">You can also replay with the Space key</p>
-            <div class="mt-3">
-              <button id="btnRandomMidi" type="button"
-                      class="btn btn-outline-info rounded-pill fw-bold px-3 py-2">
-                🎲 Random MIDI (≥1 min)
-              </button>
-              <p class="small text-muted mt-1 mb-0">Pick a random song over 1 minute from the MIDI library</p>
-            </div>
-            <div>
-              <button id="btnChangeFileResult" type="button"
-                      class="btn btn-sm btn-link text-muted mt-2">📂 Back to start screen</button>
+        <div class="modal" id="screenResult" tabindex="-1" aria-labelledby="screenResultLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content text-center">
+              <div class="modal-header justify-content-center border-0 pb-0">
+                <div>
+                  <div id="resultGrade" class="grade-badge mb-1"></div>
+                  <h3 class="fw-bold mb-0 text-warning-emphasis" id="screenResultLabel">RESULT</h3>
+                </div>
+              </div>
+              <div class="modal-body pt-2">
+                <table id="resultTable" class="mx-auto mb-0 small">
+                  <tr><td class="label">Score</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
+                  <tr><td class="label">Accuracy</td> <td id="rAccuracy" class="text-end"></td></tr>
+                  <tr><td class="label">Max Combo</td><td id="rCombo"    class="text-end"></td></tr>
+                  <tr><td class="label">Perfect</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
+                  <tr><td class="label">Great</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
+                  <tr><td class="label">Good</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
+                  <tr><td class="label">Miss</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
+                  <tr><td class="label">Difficulty</td><td id="rDifficulty" class="text-end"></td></tr>
+                  <tr><td class="label">Lanes</td>   <td id="rLanes"     class="text-end"></td></tr>
+                  <tr><td class="label">Scroll</td>  <td id="rScrollSpeed" class="text-end"></td></tr>
+                </table>
+              </div>
+              <div class="modal-footer flex-column border-0 pt-0">
+                <div class="d-flex gap-1 w-100 justify-content-center">
+                  <div class="w-50">
+                    <button id="btnBigReplay" type="button"
+                            class="btn btn-primary rounded-pill fw-bold w-100">
+                      ▶ Play again
+                    </button>
+                    <p class="small text-muted mt-1 mb-0 d-none d-md-block">
+                      You can also replay with the Space key
+                    </p>
+                  </div>
+                  <div class="w-50">
+                    <button id="btnRandomMidi" type="button"
+                            class="btn btn-outline-info rounded-pill fw-bold w-100">
+                      🎲 Random MIDI
+                    </button>
+                    <p class="small text-muted mt-1 mb-0 d-none d-md-block">
+                      Pick a random song over 1 minute from the MIDI library
+                    </p>
+                  </div>
+                </div>
+                <button id="btnChangeFileResult" type="button"
+                        class="btn btn-sm btn-link text-muted">📂 Back to start screen</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Settings (Bootstrap modal) -->
+        <!-- Settings -->
         <div class="modal" id="screenSettings" tabindex="-1"
              aria-labelledby="screenSettingsLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-scrollable">

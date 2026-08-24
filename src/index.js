@@ -10,7 +10,7 @@
  * rhythm-game-worker.js での判定/描画）は完全に共通。
  */
 
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.2/dist/midy.min.js";
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.3/dist/midy.min.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
   DIFFICULTIES,
@@ -155,6 +155,13 @@ const soundFontModal = Modal.getOrCreateInstance(
   document.getElementById("soundFontLibraryModal"),
 );
 const settingsModal = Modal.getOrCreateInstance(screenSettings);
+// 結果画面はスコア確定後の一時停止的な画面のため、背景クリックや Esc で
+// 誤って閉じてしまわないよう backdrop: "static" / keyboard: false にする
+// （閉じるには Play again / Random MIDI / Back to start screen のいずれかを押す）。
+const resultModal = Modal.getOrCreateInstance(screenResult, {
+  backdrop: "static",
+  keyboard: false,
+});
 const htmlLang = document.documentElement.lang || "en";
 
 // ---------------------------------------------------------------------------
@@ -756,11 +763,11 @@ function beginPlayback() {
       screenStart,
       screenReady,
       screenAnalyzing,
-      screenResult,
     ]
   ) {
     s.classList.add("hidden");
   }
+  resultModal.hide();
   libraryModal.hide();
   soundFontModal.hide();
   settingsModal.hide();
@@ -886,7 +893,11 @@ function showScreen(name) {
   screenStart.classList.toggle("hidden", name !== "start");
   screenReady.classList.toggle("hidden", name !== "ready");
   screenAnalyzing.classList.toggle("hidden", name !== "analyzing");
-  screenResult.classList.toggle("hidden", name !== "result");
+  if (name === "result") {
+    resultModal.show();
+  } else {
+    resultModal.hide();
+  }
   settingsModal.hide();
   libraryModal.hide();
   soundFontModal.hide();
@@ -954,6 +965,12 @@ function showResult() {
   document.getElementById("rGreat").textContent = lastResult.great;
   document.getElementById("rGood").textContent = lastResult.good;
   document.getElementById("rMiss").textContent = lastResult.miss;
+  const rDiff = document.getElementById("rDifficulty");
+  const rLanes = document.getElementById("rLanes");
+  const rScroll = document.getElementById("rScrollSpeed");
+  if (rDiff) rDiff.textContent = config.difficulty;
+  if (rLanes) rLanes.textContent = String(config.laneCount);
+  if (rScroll) rScroll.textContent = String(config.scrollSpeed);
 
   showScreen("result");
 }

@@ -638,39 +638,58 @@
         </div>
 
         <!-- 结算画面 -->
-        <div id="screenResult" class="overlay hidden">
-          <div class="card p-4 text-center border-secondary-subtle" style="min-width:270px;">
-            <div id="resultGrade" class="grade-badge mb-2"></div>
-            <h3 class="fw-bold mb-3 text-warning-emphasis">结果</h3>
-            <table id="resultTable" class="mx-auto mb-3 small">
-              <tr><td class="label">得分</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
-              <tr><td class="label">准确率</td> <td id="rAccuracy" class="text-end"></td></tr>
-              <tr><td class="label">最大连击</td><td id="rCombo"    class="text-end"></td></tr>
-              <tr><td class="label">完美</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
-              <tr><td class="label">优秀</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
-              <tr><td class="label">良好</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
-              <tr><td class="label">未命中</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
-            </table>
-            <button id="btnBigReplay" type="button"
-                    class="btn btn-primary rounded-pill fw-bold px-4 py-2">
-              ▶ 再玩一次
-            </button>
-            <p class="small text-muted mt-2 mb-0">你也可以按空格键重新开始</p>
-            <div class="mt-3">
-              <button id="btnRandomMidi" type="button"
-                      class="btn btn-outline-info rounded-pill fw-bold px-3 py-2">
-                🎲 随机 MIDI（≥1 分钟）
-              </button>
-              <p class="small text-muted mt-1 mb-0">从 MIDI 库中随机挑选一首时长超过 1 分钟的歌曲</p>
-            </div>
-            <div>
-              <button id="btnChangeFileResult" type="button"
-                      class="btn btn-sm btn-link text-muted mt-2">📂 返回开始画面</button>
+        <div class="modal" id="screenResult" tabindex="-1" aria-labelledby="screenResultLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content text-center">
+              <div class="modal-header justify-content-center border-0 pb-0">
+                <div>
+                  <div id="resultGrade" class="grade-badge mb-1"></div>
+                  <h3 class="fw-bold mb-0 text-warning-emphasis" id="screenResultLabel">结果</h3>
+                </div>
+              </div>
+              <div class="modal-body pt-2">
+                <table id="resultTable" class="mx-auto mb-0 small">
+                  <tr><td class="label">得分</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
+                  <tr><td class="label">准确率</td> <td id="rAccuracy" class="text-end"></td></tr>
+                  <tr><td class="label">最大连击</td><td id="rCombo"    class="text-end"></td></tr>
+                  <tr><td class="label">完美</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
+                  <tr><td class="label">优秀</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
+                  <tr><td class="label">良好</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
+                  <tr><td class="label">未命中</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
+                  <tr><td class="label">难度</td>    <td id="rDifficulty" class="text-end"></td></tr>
+                  <tr><td class="label">轨道</td>    <td id="rLanes"     class="text-end"></td></tr>
+                  <tr><td class="label">下落速度</td><td id="rScrollSpeed" class="text-end"></td></tr>
+                </table>
+              </div>
+              <div class="modal-footer flex-column border-0 pt-0">
+                <div class="d-flex gap-1 w-100 justify-content-center">
+                  <div class="w-50">
+                    <button id="btnBigReplay" type="button"
+                                              class="btn btn-primary rounded-pill fw-bold w-100">
+                      ▶ 再玩一次
+                    </button>
+                    <p class="small text-muted mt-1 mb-0 d-none d-md-block">
+                    也可以按空格键重新开始
+                    </p>
+                  </div>
+                  <div class="w-50">
+                    <button id="btnRandomMidi" type="button"
+                                               class="btn btn-outline-info rounded-pill fw-bold w-100">
+                      🎲 随机 MIDI
+                    </button>
+                    <p class="small text-muted mt-1 mb-0 d-none d-md-block">
+                    从 MIDI 音乐库中随机选择一首超过 1 分钟的歌曲
+                    </p>
+                  </div>
+                </div>
+                <button id="btnChangeFileResult" type="button"
+                                                 class="btn btn-sm btn-link text-muted">📂 返回开始画面</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 设置（Bootstrap 模态框） -->
+        <!-- 设置 -->
         <div class="modal" id="screenSettings" tabindex="-1"
              aria-labelledby="screenSettingsLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-scrollable">
