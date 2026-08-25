@@ -111,20 +111,39 @@
       }
       #uiCanvas { pointer-events: auto; outline: none; }
 
-      /* 曲目署名信息（标题 / 作曲者 / 网站 / 授权）在准备/游玩/结算画面中显示。
-         始终位于 #topnav 下方（绝不会覆盖或进入导航栏）。在宽屏下与暂停按钮/分数
-         共享一行并留出左右边距；在窄屏下会堆叠在它们上方，
-         并通过 --attr-h 将暂停按钮与画布 HUD 一起下移（由 JS 设置）。 */
-      #trackAttribution {
+      /* ===== HUD 布局：暂停按钮 / 曲目信息 / 分数 =====
+         使用一个 CSS Grid 替代之前的 absolute-position + JS 高度同步（--attr-h）方案。
+         Grid 的 "auto" 轨道会根据每个元素实际渲染出的宽度和高度自动调整，
+         因此即使字体度量存在差异，暂停按钮和分数也不会与曲目信息重叠。
+         同时也不需要 JS 测量元素尺寸来防止重叠。
+         宽屏：单行 [暂停 | 曲目信息（可变宽度） | 分数]
+         窄屏 / 短屏：曲目信息单独占一整行，
+         暂停按钮和分数在下面一行左右排列。
+         仅通过媒体查询切换 Grid 模板，无需 JS。 */
+      #hudStack {
         position: absolute;
-        top: calc(var(--topbar-h, 48px) + 0.2rem);
-        left: 3.6rem;   /* ≈ pause button (2.4rem) + left:10px + gap */
-        right: 7.0rem;  /* score HUD (~7 digits + padding) */
+        top: var(--topbar-h, 48px);
+        left: 0.625rem;
+        right: 0.625rem;
         z-index: 6;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: "pause attr score";
+        align-items: start;
+        column-gap: 0.5rem;
+        pointer-events: none;
+      }
+      #hudStack > * { pointer-events: none; }
+      #btnPause { grid-area: pause; pointer-events: auto; }
+      #trackAttribution { grid-area: attr; }
+      #scoreDisplay { grid-area: score; }
+
+      #trackAttribution {
+        margin-top: 0.2rem;
         padding: 0.2rem 0.45rem;
         border-radius: 0.4rem;
         text-align: center;
-        pointer-events: none;
+        min-width: 0; /* allow the grid item to shrink below content width for ellipsis */
         background: color-mix(in srgb, var(--bs-body-bg) 38%, transparent);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
@@ -154,11 +173,38 @@
         content: " · ";
         opacity: 0.7;
       }
-      /* 窄屏 / 矮屏：紧贴导航栏下方显示的全宽条；暂停按钮/分数通过 --attr-h 向下偏移 */
+
+      /* 分数 HUD。之前使用 Canvas（ctx.fillText）绘制，
+         现在改为 DOM 元素，让浏览器负责实际布局，
+         从而不再需要自行估算像素宽度。
+         外观与之前相同：
+         使用粗体等宽字体，
+         颜色通过 --score-color 指定。
+         --score-color 由 JS 设置为与 rhythm-game.js 中的
+         accentColor||uiColor 相同的颜色。
+         不添加发光效果。
+         Canvas 版本的分数本身也没有发光效果，只有连击会发光。 */
+      #scoreDisplay {
+        margin-top: 0.2rem;
+        padding-right: 0.2rem;
+        font: bold 1.15rem/1.2 monospace;
+        color: var(--score-color, currentColor);
+        text-align: right;
+        white-space: nowrap;
+      }
+      #scoreDisplay.hidden { display: none !important; }
+
+      /* Narrow / short: attribution full-width on its own row; pause/score below it */
       @media (max-width: 576px), (max-height: 420px) {
+        #hudStack {
+          grid-template-columns: auto 1fr;
+          grid-template-rows: auto auto;
+          grid-template-areas:
+            "attr  attr"
+            "pause score";
+          row-gap: 0.3rem;
+        }
         #trackAttribution {
-          left: 0.5rem;
-          right: 0.5rem;
           padding: 0.15rem 0.4rem;
           background: color-mix(in srgb, var(--bs-body-bg) 32%, transparent);
         }
@@ -489,32 +535,40 @@
         <canvas id="particleCanvas" class="gameLayer"></canvas>
         <canvas id="uiCanvas"       class="gameLayer"></canvas>
 
-        <!-- 左上角的暂停按钮，与右上角画布上绘制的分数左右对称。
-             MIDI 模式与音频模式都通过此按钮调用 togglePause()
-             （MIDI 模式内部使用 midy.pause()/resume()）。
-             #topnav 是覆盖在同一左上角的透明层，如果不做偏移
-             品牌 Logo 会抢占该按钮的点击区域。
-             通过 --topbar-h（由 game.js 中的 setWrapHeight() 设置）向下偏移。
-             使用 SVG 而非表情符号（⏸/▶），以避免圆形按钮上出现
-             字体/系统相关的溢出或裁切问题；使用固定尺寸的 SVG。
-             实际的图标切换由 game.js 中的 ICON_PAUSE / ICON_PLAY
-             通过 innerHTML 完成。 -->
-        <button id="btnPause" type="button" title="按空格键暂停/继续"
-                class="btn btn-sm btn-secondary rounded-circle hidden
-                       d-flex align-items-center justify-content-center"
-                style="position:absolute; top:calc(var(--topbar-h, 0px) + var(--attr-h, 0px));
-                       left:10px; z-index:5;
-                       width:2.4rem; height:2.4rem; padding:0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-               viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-            <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
-          </svg>
-        </button>
+        <!-- HUD 布局：暂停按钮、曲目信息、分数。
+             通过 #hudStack 的 CSS Grid（见上文）统一进行布局，
+             确保它们不会相互重叠。
+             窄屏和宽屏之间的布局切换完全通过 CSS 完成，
+             无需 JS 同步高度。 -->
+        <div id="hudStack">
+          <!-- 暂停按钮。MIDI 模式和音频模式都会通过此按钮调用 togglePause()。
+               MIDI 模式内部会使用 midy.pause()/resume()。
+               使用 SVG 替代 ⏸ / ▶ 表情符号，以避免不同字体或操作系统
+               导致图标溢出或被裁剪。
+               SVG 使用固定尺寸。
+               实际的图标切换由 game.js 通过 innerHTML 设置
+               ICON_PAUSE / ICON_PLAY 来完成。 -->
+          <button id="btnPause" type="button" title="Space to pause/resume"
+                  class="btn btn-sm btn-secondary rounded-circle hidden
+                         d-flex align-items-center justify-content-center"
+                  style="width:2.4rem; height:2.4rem; padding:0;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                 viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+              <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
+            </svg>
+          </button>
 
-        <!-- MIDI 库曲目的署名信息（标题 / 作曲者 / 网站 / 授权） -->
-        <div id="trackAttribution" class="small hidden" aria-live="polite">
-          <div id="trackAttrTitle"></div>
-          <div id="trackAttrMeta"></div>
+          <!-- Track attribution for MIDI library works (title / composer / site / license) -->
+          <div id="trackAttribution" class="small hidden" aria-live="polite">
+            <div id="trackAttrTitle"></div>
+            <div id="trackAttrMeta"></div>
+          </div>
+
+          <!-- Score HUD. Formerly drawn on the Canvas top-right corner
+               (rhythm-game.js #drawHUD); moved to DOM so the grid can size around
+               its real rendered width instead of us hard-coding an inset. Text is
+               kept in sync with lastResult.score from game.js's rAF loop. -->
+          <div id="scoreDisplay" class="hidden" aria-hidden="true">0000000</div>
         </div>
 
         <!-- 暂停遮罩（仅在游玩中由 btnPause 切换显示/隐藏） -->

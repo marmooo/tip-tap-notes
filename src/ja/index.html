@@ -111,16 +111,38 @@
       }
       #uiCanvas { pointer-events: auto; outline: none; }
 
-      /* トラック帰属表示（タイトル / 作曲者 / サイト / ライセンス）。ready / playing / result 中に表示。
-         常に #topnav の下（ナビバー上や中には被らない）。広い画面では左右余白を取り
-           一時停止ボタン・スコア行と横並び。狭い画面ではその上に積み上げ、
-         --attr-h で一時停止とキャンバスHUDを下げる（JS側で設定）。 */
-      #trackAttribution {
+      /* ===== HUD スタック: ポーズボタン / 曲情報 / スコア =====
+         以前の absolute-position + JS による高さ同期（--attr-h）方式をやめ、
+         1つの CSS Grid でレイアウトする。
+         Grid の "auto" トラックは各要素の実際の描画幅・高さに合わせて
+         自動的にサイズ調整されるため、フォントによるメトリクスの違いがあっても
+         ポーズボタンとスコアが曲情報と重ならない。
+         衝突を防ぐために JS でサイズを測定する必要もない。
+         横幅の広い画面: 1行 [ポーズ | 曲情報（可変幅） | スコア]
+         狭い / 高さの低い画面: 曲情報を独立した全幅の行に配置し、
+         その下の行でポーズとスコアを左右に配置する。
+         メディアクエリで Grid のテンプレートを切り替えるだけで、
+         JS は使用しない。 */
+      #hudStack {
         position: absolute;
-        top: calc(var(--topbar-h, 48px) + 0.2rem);
-        left: 3.6rem;   /* ≈ pause button (2.4rem) + left:10px + gap */
-        right: 7.0rem;  /* score HUD (~7 digits + padding) */
+        top: var(--topbar-h, 48px);
+        left: 0.625rem;
+        right: 0.625rem;
         z-index: 6;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: "pause attr score";
+        align-items: start;
+        column-gap: 0.5rem;
+        pointer-events: none;
+      }
+      #hudStack > * { pointer-events: none; }
+      #btnPause { grid-area: pause; pointer-events: auto; }
+      #trackAttribution { grid-area: attr; }
+      #scoreDisplay { grid-area: score; }
+
+      #trackAttribution {
+        margin-top: 0.2rem;
         padding: 0.2rem 0.45rem;
         border-radius: 0.4rem;
         text-align: center;
@@ -154,11 +176,38 @@
         content: " · ";
         opacity: 0.7;
       }
-      /* 狭い・低い画面: ナビ直下の全幅バー。一時停止・スコアは --attr-h で下へずらす */
+
+      /* スコア HUD。以前は Canvas（ctx.fillText）に描画していたが、
+         現在は DOM 要素に変更し、ブラウザ自身にレイアウトさせることで
+         ピクセル幅を推測する必要をなくした。
+         見た目は以前と同じ:
+         太字の等幅フォントを使用し、
+         色は --score-color で指定する。
+         --score-color は rhythm-game.js の accentColor||uiColor と
+         同じ色になるよう JS から設定する。
+         グロー効果は付けない。
+         Canvas 版のスコアにもグローはなく、グローするのはコンボだけ。 */
+      #scoreDisplay {
+        margin-top: 0.2rem;
+        padding-right: 0.2rem;
+        font: bold 1.15rem/1.2 monospace;
+        color: var(--score-color, currentColor);
+        text-align: right;
+        white-space: nowrap;
+      }
+      #scoreDisplay.hidden { display: none !important; }
+
+      /* Narrow / short: attribution full-width on its own row; pause/score below it */
       @media (max-width: 576px), (max-height: 420px) {
+        #hudStack {
+          grid-template-columns: auto 1fr;
+          grid-template-rows: auto auto;
+          grid-template-areas:
+            "attr  attr"
+            "pause score";
+          row-gap: 0.3rem;
+        }
         #trackAttribution {
-          left: 0.5rem;
-          right: 0.5rem;
           padding: 0.15rem 0.4rem;
           background: color-mix(in srgb, var(--bs-body-bg) 32%, transparent);
         }
@@ -500,31 +549,41 @@
         <canvas id="particleCanvas" class="gameLayer"></canvas>
         <canvas id="uiCanvas"       class="gameLayer"></canvas>
 
-        <!-- スコア（Canvas右上に描画）と対称に、左上に一時停止ボタンを配置。
-             MIDI/音声どちらのモードもこのボタンから togglePause() を呼ぶ
-             （MIDIモードは内部で midy.pause()/resume() を直接使う）。
-             #topnav は透過オーバーレイで同じ左上コーナーに浮いているため、
-             そのままだとブランドロゴの当たり判定に埋もれて押せなくなる。
-             --topbar-h（game.js の setWrapHeight() が設定）ぶんだけ下にずらす。
-             中身のSVGは絵文字（⏸/▶）の代わり。フォント/OS依存で丸ボタンから
-             はみ出したり欠けたりするのを避けるため、固定サイズのSVGに統一
-             （実際の切り替えは game.js の ICON_PAUSE / ICON_PLAY が innerHTML で行う）。 -->
-        <button id="btnPause" type="button" title="スペースキーで一時停止/再開"
-                class="btn btn-sm btn-secondary rounded-circle hidden
-                       d-flex align-items-center justify-content-center"
-                style="position:absolute; top:calc(var(--topbar-h, 0px));
-                       left:10px; z-index:5;
-                       width:2.4rem; height:2.4rem; padding:0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-               viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-            <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
-          </svg>
-        </button>
+        <!-- HUD スタック: ポーズボタン / 曲情報 / スコア。
+             #hudStack の CSS Grid（上記参照）でまとめてレイアウトすることで、
+             要素同士が重ならないようにする。
+             狭い画面と広い画面での配置変更も CSS だけで行い、
+             JS による高さ同期は不要。 -->
+        <div id="hudStack">
+          <!-- ポーズボタン。
+               MIDI モードと音声モードのどちらも、このボタンから togglePause() を呼び出す。
+               MIDI モードでは内部的に midy.pause()/resume() を使用する。
+               ⏸ / ▶ の絵文字ではなく SVG を使用することで、
+               フォントや OS によるはみ出し・クリッピングを防ぐ。
+               SVG は固定サイズ。
+               実際のアイコン切り替えは game.js の
+               ICON_PAUSE / ICON_PLAY を innerHTML に設定して行う。 -->
+          <button id="btnPause" type="button" title="Space to pause/resume"
+                  class="btn btn-sm btn-secondary rounded-circle hidden
+                         d-flex align-items-center justify-content-center"
+                  style="width:2.4rem; height:2.4rem; padding:0;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                 viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+              <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
+            </svg>
+          </button>
 
-        <!-- MIDIライブラリ作品のトラック帰属表示（タイトル / 作曲者 / サイト / ライセンス） -->
-        <div id="trackAttribution" class="small hidden" aria-live="polite">
-          <div id="trackAttrTitle"></div>
-          <div id="trackAttrMeta"></div>
+          <!-- Track attribution for MIDI library works (title / composer / site / license) -->
+          <div id="trackAttribution" class="small hidden" aria-live="polite">
+            <div id="trackAttrTitle"></div>
+            <div id="trackAttrMeta"></div>
+          </div>
+
+          <!-- Score HUD. Formerly drawn on the Canvas top-right corner
+               (rhythm-game.js #drawHUD); moved to DOM so the grid can size around
+               its real rendered width instead of us hard-coding an inset. Text is
+               kept in sync with lastResult.score from game.js's rAF loop. -->
+          <div id="scoreDisplay" class="hidden" aria-hidden="true">0000000</div>
         </div>
 
         <!-- 一時停止中の表示（プレイ中のみ btnPause から表示/非表示を切り替え） -->

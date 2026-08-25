@@ -145,7 +145,26 @@ const screenResult = document.getElementById("screenResult");
 const screenSettings = document.getElementById("screenSettings");
 const pauseOverlay = document.getElementById("pauseOverlay");
 const btnPause = document.getElementById("btnPause");
+const scoreDisplay = document.getElementById("scoreDisplay");
 const player = document.getElementById("player"); // 音声モード用 <audio>
+
+// btnPause と scoreDisplay は常に同じタイミングで表示/非表示になる
+// （#hudStack 内で並んで表示される一組の HUD のため）ので、まとめて操作する。
+// scoreDisplay は「HTML が古いまま（キャッシュ等）で #hudStack 側の変更が
+// 反映されていない」場合に null になり得るため、その場合も他のUIが落ちない
+// よう optional chaining で防御する。
+function showPlayHud() {
+  pauseOverlay.classList.add("hidden");
+  btnPause.classList.remove("hidden");
+  btnPause.innerHTML = ICON_PAUSE;
+  scoreDisplay?.classList.remove("hidden");
+  if (scoreDisplay) scoreDisplay.textContent = "0000000";
+}
+function hidePlayHud() {
+  pauseOverlay.classList.add("hidden");
+  btnPause.classList.add("hidden");
+  scoreDisplay?.classList.add("hidden");
+}
 
 // MIDI / SoundFont ライブラリ、設定画面はすべて Bootstrap の modal で表示する
 const libraryModal = Modal.getOrCreateInstance(
@@ -242,9 +261,10 @@ function setWrapHeight() {
   // 高さからは差し引かない（iPhone SE の横置きのような縦が狭い端末でも
   // canvas を画面いっぱいに使えるようにするため）。
   // ただし #topnav のブランドロゴ／ボタンは canvas と同じ左上・右上の
-  // コーナーに重なって浮いているため、btnPause やスコア表示など
-  // canvas 側の左右上隅の UI 要素はこの高さぶんだけ避けてやる必要がある。
-  // その受け渡し用に --topbar-h を CSS 変数として置いておく。
+  // コーナーに重なって浮いているため、#hudStack（pause/attribution/score）は
+  // この高さぶんだけ避けてやる必要がある。その受け渡し用に --topbar-h を
+  // CSS 変数として置いておく（#hudStack 自身の縦積み/横並びの切り替えは
+  // CSS Grid のメディアクエリ側で完結しており、ここでは関与しない）。
   const topbarH = document.getElementById("topnav")?.offsetHeight ?? 0;
   document.documentElement.style.setProperty("--topbar-h", topbarH + "px");
 
@@ -258,8 +278,6 @@ function setWrapHeight() {
   // 「プレイ中と同じ画面いっぱいのサイズ」（フッター分だけ差し引く）に固定する。
   canvasWrap.style.height = Math.max(300, globalThis.innerHeight - footerH) +
     "px";
-  // 狭い画面では attribution の高さぶん pause / スコアを下げる（--attr-h）
-  syncAttributionStackHeight();
   resizeCanvases();
 }
 globalThis.addEventListener("resize", setWrapHeight);
@@ -346,34 +364,16 @@ function currentGameTime() {
 // ---------------------------------------------------------------------------
 
 // #topnav は canvas の上に浮く透過オーバーレイのため、rhythm-game-worker.js
-// 側で右上 HUD（スコア等）を描くときに、navbar の高さぶんだけ避けないと
-// 🌓（ダークモード切替）ボタンと重なってしまう。canvas は dpr 込みの
-// 座標系なので dpr を掛けて渡す。
-// 狭い画面で attribution を pause/スコアの上に積むときは --attr-h も加算する。
+// 側で canvas 中央の combo 表示を描くときに、#hudStack（pause/attribution/
+// score。score は現在 DOM 表示なので実体は pause+attribution）の高さぶんだけ
+// 避けないと重なってしまう。#hudStack は幅広画面では横並び1行、狭い/低い
+// 画面では attribution が上に乗って2行になる（CSS Grid のメディアクエリで
+// 自動切り替え）ため、実際のレイアウト後の高さを直接測る。
+// canvas は dpr 込みの座標系なので dpr を掛けて渡す。
 function computeTopInset() {
   const topbarH = document.getElementById("topnav")?.offsetHeight ?? 0;
-  const attrH = Number.parseFloat(
-    getComputedStyle(document.documentElement).getPropertyValue("--attr-h"),
-  ) || 0;
-  return Math.round((topbarH + attrH) * dpr);
-}
-
-/** 狭い画面で attribution 表示中だけ、その高さぶん pause / HUD を下げる。
- *  --attr-h を更新するだけ。Worker への反映は resizeCanvases() 側。 */
-function syncAttributionStackHeight() {
-  const root = document.getElementById("trackAttribution");
-  const narrow = globalThis.matchMedia(
-    "(max-width: 576px), (max-height: 420px)",
-  ).matches;
-  let attrH = 0;
-  if (
-    narrow && root && !root.classList.contains("hidden") &&
-    root.offsetParent !== null
-  ) {
-    // attribution 本体 + わずかな隙間
-    attrH = Math.ceil(root.getBoundingClientRect().height) + 4;
-  }
-  document.documentElement.style.setProperty("--attr-h", attrH + "px");
+  const hudStackH = document.getElementById("hudStack")?.offsetHeight ?? 0;
+  return Math.round((topbarH + hudStackH) * dpr);
 }
 
 function buildWorkerOptions() {
@@ -414,6 +414,15 @@ function buildWorkerOptions() {
 // HUD文字の土台色として使われる。
 function computeUiColor() {
   return getComputedStyle(document.body).color || "#ffffff";
+}
+
+// #scoreDisplay（DOM）を Canvas HUD と同じ色ロジックで塗るための橋渡し。
+// rhythm-game.js の drawHUD が使う「accentColor || uiColor」の優先順位に合わせる。
+function syncScoreColor() {
+  document.documentElement.style.setProperty(
+    "--score-color",
+    config.accentColor || computeUiColor(),
+  );
 }
 
 function initWorker() {
@@ -459,6 +468,7 @@ function initWorker() {
   const particleOff = particleCanvas.transferControlToOffscreen();
   const uiOff = uiCanvas.transferControlToOffscreen();
 
+  syncScoreColor(); // Canvas HUD（accentColor||uiColor）と #scoreDisplay の色を揃える
   worker.postMessage(
     {
       type: "init",
@@ -619,6 +629,12 @@ function startRaf() {
   if (rafId !== null) return;
   function loop() {
     gameLogicTick();
+    // スコアは "judgment" メッセージで lastResult.score に随時反映されるが、
+    // DOM 表示（#scoreDisplay）への書き戻しは毎フレームここでまとめて行う
+    // （以前は Canvas 側で毎フレーム再描画していたのと同じ頻度・同じ場所）。
+    if (scoreDisplay) {
+      scoreDisplay.textContent = String(lastResult.score).padStart(7, "0");
+    }
     // handleShortEnding() が showResult()→stopRaf() を呼んで rafId を null に
     // していたら、ここで再度スケジュールしてしまわないようにする。
     if (rafId !== null) rafId = requestAnimationFrame(loop);
@@ -773,9 +789,7 @@ function beginPlayback() {
   settingsModal.hide();
   userInitiatedMidiPause = false;
   isPaused = false;
-  pauseOverlay.classList.add("hidden");
-  btnPause.classList.remove("hidden");
-  btnPause.innerHTML = ICON_PAUSE;
+  showPlayHud();
   setWrapHeight(); // gamePhase="playing" になったので、ここでキャンバスを画面いっぱいに広げる
   updateTrackAttributionUI();
   startRaf();
@@ -831,6 +845,7 @@ function applyConfigToGame(cfg) {
       gamePhase = "playing";
     } else {
       // 色・オフセット等のみ：既存 Worker にパッチを送るだけ（Canvas 再確保しない）
+      syncScoreColor();
       worker?.postMessage({
         type: "updateOptions",
         patch: {
@@ -851,6 +866,7 @@ function applyConfigToGame(cfg) {
     if (!worker || structuralChanged || laneOrDiffChanged) {
       buildGame();
     } else {
+      syncScoreColor();
       worker.postMessage({
         type: "updateOptions",
         patch: {
@@ -902,8 +918,7 @@ function showScreen(name) {
   libraryModal.hide();
   soundFontModal.hide();
   isPaused = false;
-  pauseOverlay.classList.add("hidden");
-  btnPause.classList.add("hidden");
+  hidePlayHud();
   setWrapHeight(); // gamePhase が変わったので、フルスクリーン⇄通常レイアウトを再計算する
   updateTrackAttributionUI();
 }
@@ -925,8 +940,7 @@ function showResult() {
   }
   gamePhase = "result";
   isPaused = false;
-  pauseOverlay.classList.add("hidden");
-  btnPause.classList.add("hidden");
+  hidePlayHud();
   setWrapHeight(); // フルスクリーン表示から通常レイアウトに戻す
 
   const judged = lastResult.perfect + lastResult.great + lastResult.good +
@@ -1328,6 +1342,7 @@ document.getElementById("toggleDarkMode").addEventListener("click", () => {
   // ゲーム進行中でもレーン区切り線・判定ライン・HUD文字が見えなくならないよう、
   // 稼働中の worker にも新しいテーマ文字色を反映する
   // （rhythm-game-worker.js の "updateOptions" は msg.patch を読む契約なので合わせる）。
+  syncScoreColor();
   worker?.postMessage({
     type: "updateOptions",
     patch: { uiColor: computeUiColor() },
@@ -1852,7 +1867,9 @@ function updateTrackAttributionUI() {
   if (!meta) {
     titleEl.textContent = "";
     metaEl.innerHTML = "";
-    syncAttributionStackHeight();
+    // attribution の表示/非表示で #hudStack の高さが変わるので、combo が
+    // 重ならないよう topInset を再計算させる（縦積みの折返しは CSS Grid が
+    // 自動でやるので、ここでは resizeCanvases() だけでよい）。
     if (worker) resizeCanvases();
     return;
   }
@@ -1885,8 +1902,8 @@ function updateTrackAttributionUI() {
     }
   }
   metaEl.innerHTML = parts.join("");
-  // 表示後に高さを測って狭い画面の pause/スコア位置を更新し、HUD にも反映
-  syncAttributionStackHeight();
+  // 表示後に #hudStack の高さが変わるので、combo が重ならないよう
+  // topInset を再計算させる（縦積みの折返し自体は CSS Grid 側で完結する）。
   if (worker) resizeCanvases();
 }
 
@@ -2050,6 +2067,8 @@ midy.addEventListener("resumed", () => {
     btnPause.classList.remove("hidden");
     btnPause.innerHTML = ICON_PAUSE;
   }
+  // resume なので scoreDisplay の文字はリセットしない（現在のスコアを保持したまま出す）
+  scoreDisplay?.classList.remove("hidden");
   if (gamePhase === "playing") {
     _resumeBaseGameTime = _pausedAt;
     _resumeBasePerf = performance.now();
@@ -2277,9 +2296,7 @@ function beginAudioRound() {
     };
     worker?.postMessage({ type: "start" });
     isPaused = false;
-    pauseOverlay.classList.add("hidden");
-    btnPause.classList.remove("hidden");
-    btnPause.innerHTML = ICON_PAUSE;
+    showPlayHud();
     startRaf();
     uiCanvas.focus({ preventScroll: true });
   } else {

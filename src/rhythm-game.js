@@ -473,7 +473,6 @@ export class RhythmGame {
   #cachedHitY = 0;
   #cachedLaneW = 0;
   #cachedBtnFont = "";
-  #cachedHUDFont = "";
   #cachedComboFont = "";
   #uiDirty = true; // UIレイヤーの再描画フラグ
 
@@ -1088,9 +1087,6 @@ export class RhythmGame {
       this.#cachedBtnFont = `bold ${
         Math.min(22 * d, this.#cachedLaneW * 0.28).toFixed(0)
       }px monospace`;
-      this.#cachedHUDFont = `bold ${
-        Math.min(26 * d, W * 0.05).toFixed(0)
-      }px monospace`;
       this.#cachedComboFont = `bold ${
         Math.min(44 * d, W * 0.09).toFixed(0)
       }px sans-serif`;
@@ -1626,6 +1622,7 @@ export class RhythmGame {
   }
 
   #drawHUD(ctx, W, H, o) {
+    // スコア表示は #scoreDisplay（DOM）側に移動済み。ここでは combo のみ描画する。
     ctx.textBaseline = "top";
     ctx.shadowBlur = 0;
     const textColor = o.accentColor || o.uiColor;
@@ -1636,7 +1633,7 @@ export class RhythmGame {
       ctx.shadowColor = textColor;
       ctx.shadowBlur = o.glow ? 12 * d : 0;
       ctx.textAlign = "center";
-      // topInset（navbar + 狭い画面の attribution）より下に出す
+      // topInset（navbar + #hudStack の高さ）より下に出す
       drawText(
         ctx,
         `${this.#combo} COMBO`,
@@ -1646,15 +1643,5 @@ export class RhythmGame {
       );
       ctx.shadowBlur = 0;
     }
-
-    ctx.font = this.#cachedHUDFont;
-    ctx.textAlign = "right";
-    drawText(
-      ctx,
-      String(this.#score).padStart(7, "0"),
-      W - 10 * d,
-      10 * d + (o.topInset || 0),
-      textColor,
-    );
   }
 }

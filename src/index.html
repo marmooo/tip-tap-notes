@@ -111,20 +111,40 @@
       }
       #uiCanvas { pointer-events: auto; outline: none; }
 
-      /* Track attribution (title / composer / site / license) while ready/playing/result.
-         Always under #topnav (never above/into the navbar). On wide screens it shares
-         the pause/score row with side insets; on narrow screens it stacks above them
-         and --attr-h pushes pause + canvas HUD down (set in JS). */
-      #trackAttribution {
+      /* ===== HUD stack: pause button / track attribution / score =====
+         A single CSS Grid replaces the old absolute-position + JS height-sync
+         (--attr-h) approach. Grid's "auto" tracks size themselves to each
+         item's real rendered width/height, so pause and score never overlap
+         attribution regardless of font metrics (no rem guessing needed), and
+         no JS has to measure anything to keep them from colliding.
+         Wide screens: one row [pause | attribution (flexible) | score].
+         Narrow/short screens: attribution on its own full-width row above,
+         pause/score sharing the row below (media query only swaps the grid
+         template; no JS involved). */
+      #hudStack {
         position: absolute;
-        top: calc(var(--topbar-h, 48px) + 0.2rem);
-        left: 3.6rem;   /* ≈ pause button (2.4rem) + left:10px + gap */
-        right: 7.0rem;  /* score HUD (~7 digits + padding) */
+        top: var(--topbar-h, 48px);
+        left: 0.625rem;
+        right: 0.625rem;
         z-index: 6;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: "pause attr score";
+        align-items: start;
+        column-gap: 0.5rem;
+        pointer-events: none;
+      }
+      #hudStack > * { pointer-events: none; }
+      #btnPause { grid-area: pause; pointer-events: auto; }
+      #trackAttribution { grid-area: attr; }
+      #scoreDisplay { grid-area: score; }
+
+      #trackAttribution {
+        margin-top: 0.2rem;
         padding: 0.2rem 0.45rem;
         border-radius: 0.4rem;
         text-align: center;
-        pointer-events: none;
+        min-width: 0; /* allow the grid item to shrink below content width for ellipsis */
         background: color-mix(in srgb, var(--bs-body-bg) 38%, transparent);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
@@ -154,11 +174,33 @@
         content: " · ";
         opacity: 0.7;
       }
-      /* Narrow / short: full-width bar just under navbar; pause/score shift down via --attr-h */
+
+      /* Score HUD, formerly drawn on Canvas (ctx.fillText); now a DOM element so
+         the browser lays it out for real instead of us guessing its pixel width.
+         Same look as before: bold monospace, colored via --score-color (set from
+         JS to mirror rhythm-game.js's accentColor||uiColor), no glow (the canvas
+         version didn't glow the score either -- only combo does). */
+      #scoreDisplay {
+        margin-top: 0.2rem;
+        padding-right: 0.2rem;
+        font: bold 1.15rem/1.2 monospace;
+        color: var(--score-color, currentColor);
+        text-align: right;
+        white-space: nowrap;
+      }
+      #scoreDisplay.hidden { display: none !important; }
+
+      /* Narrow / short: attribution full-width on its own row; pause/score below it */
       @media (max-width: 576px), (max-height: 420px) {
+        #hudStack {
+          grid-template-columns: auto 1fr;
+          grid-template-rows: auto auto;
+          grid-template-areas:
+            "attr  attr"
+            "pause score";
+          row-gap: 0.3rem;
+        }
         #trackAttribution {
-          left: 0.5rem;
-          right: 0.5rem;
           padding: 0.15rem 0.4rem;
           background: color-mix(in srgb, var(--bs-body-bg) 32%, transparent);
         }
@@ -489,31 +531,36 @@
         <canvas id="particleCanvas" class="gameLayer"></canvas>
         <canvas id="uiCanvas"       class="gameLayer"></canvas>
 
-        <!-- Pause button top-left, symmetric with score (drawn on Canvas top-right).
-             Both MIDI and audio modes call togglePause() from this button
-             (MIDI mode uses midy.pause()/resume() internally).
-             #topnav is a transparent overlay on the same top-left corner, so without
-             offset the brand logo would steal the hit target.
-             Shift down by --topbar-h (set by setWrapHeight() in game.js).
-             SVG instead of emoji (⏸/▶) to avoid font/OS overflow or clipping on the
-             round button; fixed-size SVG. Actual swap is done by ICON_PAUSE / ICON_PLAY
-             via innerHTML in game.js. -->
-        <button id="btnPause" type="button" title="Space to pause/resume"
-                class="btn btn-sm btn-secondary rounded-circle hidden
-                       d-flex align-items-center justify-content-center"
-                style="position:absolute; top:calc(var(--topbar-h, 0px) + var(--attr-h, 0px));
-                       left:10px; z-index:5;
-                       width:2.4rem; height:2.4rem; padding:0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-               viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-            <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
-          </svg>
-        </button>
+        <!-- HUD stack: pause button, track attribution, score. Laid out together as a
+             CSS Grid (see #hudStack) so they never overlap and the narrow/wide reflow
+             is pure CSS -- no JS height sync needed. -->
+        <div id="hudStack">
+          <!-- Pause button. Both MIDI and audio modes call togglePause() from this
+               button (MIDI mode uses midy.pause()/resume() internally).
+               SVG instead of emoji (⏸/▶) to avoid font/OS overflow or clipping on the
+               round button; fixed-size SVG. Actual swap is done by ICON_PAUSE / ICON_PLAY
+               via innerHTML in game.js. -->
+          <button id="btnPause" type="button" title="Space to pause/resume"
+                  class="btn btn-sm btn-secondary rounded-circle hidden
+                         d-flex align-items-center justify-content-center"
+                  style="width:2.4rem; height:2.4rem; padding:0;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                 viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+              <path d="M555-200v-560h175v560H555Zm-325 0v-560h175v560H230Z"></path>
+            </svg>
+          </button>
 
-        <!-- Track attribution for MIDI library works (title / composer / site / license) -->
-        <div id="trackAttribution" class="small hidden" aria-live="polite">
-          <div id="trackAttrTitle"></div>
-          <div id="trackAttrMeta"></div>
+          <!-- Track attribution for MIDI library works (title / composer / site / license) -->
+          <div id="trackAttribution" class="small hidden" aria-live="polite">
+            <div id="trackAttrTitle"></div>
+            <div id="trackAttrMeta"></div>
+          </div>
+
+          <!-- Score HUD. Formerly drawn on the Canvas top-right corner
+               (rhythm-game.js #drawHUD); moved to DOM so the grid can size around
+               its real rendered width instead of us hard-coding an inset. Text is
+               kept in sync with lastResult.score from game.js's rAF loop. -->
+          <div id="scoreDisplay" class="hidden" aria-hidden="true">0000000</div>
         </div>
 
         <!-- Pause overlay (shown/hidden from btnPause only while playing) -->
