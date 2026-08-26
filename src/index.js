@@ -112,10 +112,27 @@ function cacheModeLabel(modeOrIndex) {
 
 function loadConfig() {
   try {
-    return {
+    const loaded = {
       ...DEFAULT_CONFIG,
       ...JSON.parse(localStorage.getItem("TipTapNotesConfig") || "{}"),
     };
+    // 過去の不具合で laneKeys: [] が保存されている場合にキーコンフィグが
+    // 全滅しないよう、空・不足分は既定値で補完する。
+    if (!Array.isArray(loaded.laneKeys) || loaded.laneKeys.length === 0) {
+      loaded.laneKeys = [...DEFAULT_CONFIG.laneKeys];
+    } else {
+      const keys = [];
+      for (let i = 0; i < DEFAULT_CONFIG.laneKeys.length; i++) {
+        const k = loaded.laneKeys[i];
+        keys.push(
+          (typeof k === "string" && k.trim())
+            ? k.trim()
+            : DEFAULT_CONFIG.laneKeys[i],
+        );
+      }
+      loaded.laneKeys = keys;
+    }
+    return loaded;
   } catch (err) {
     console.warn("Failed to load saved config, falling back to defaults:", err);
     return { ...DEFAULT_CONFIG };
@@ -1089,6 +1106,30 @@ document.querySelectorAll("#playLengthToggle input[data-length]").forEach(
 // ---------------------------------------------------------------------------
 
 let configSnapshot = null;
+// 設定パネルを開いてから実際にユーザーが値を変えたかどうか。
+// 何も触らずに閉じたときは localStorage へ書き戻さない（不要な保存と、
+// 途中で壊れた値が確定するのを防ぐ）。
+let settingsDirty = false;
+
+function readLaneKeysFromUI() {
+  // 入力欄は常に8個あるが、未入力スロットを filter(Boolean) で落とすと
+  // 配列が短くなり、最悪すべて空のときに [] が localStorage に保存されて
+  // キーコンフィグが壊れる。空欄は既存 config / 既定値で埋めて常に8要素を返す。
+  const inputs = [
+    ...document.querySelectorAll("#laneKeyInputs input[type=text]"),
+  ];
+  const keys = [];
+  for (let i = 0; i < DEFAULT_CONFIG.laneKeys.length; i++) {
+    const typed = inputs[i]?.value.trim() ?? "";
+    keys.push(
+      typed ||
+        config.laneKeys[i] ||
+        DEFAULT_CONFIG.laneKeys[i] ||
+        String(i + 1),
+    );
+  }
+  return keys;
+}
 
 function readSettingsUI() {
   const gv = (id) => document.getElementById(id)?.value ?? "";
@@ -1100,8 +1141,7 @@ function readSettingsUI() {
     ...config,
     laneCount: parseInt(gv("laneCount"), 10) || 4,
     scrollSpeed: parseInt(gv("scrollSpeed"), 10) || 500,
-    laneKeys: [...document.querySelectorAll("#laneKeyInputs input[type=text]")]
-      .map((i) => i.value.trim()).filter(Boolean),
+    laneKeys: readLaneKeysFromUI(),
     laneColors: colors,
     // accentColor 用の <input type=color> は常に何らかの16進値を持ってしまう
     // （空値を表現できない）ため、ユーザーが実際に触った場合だけ値を採用し、
@@ -1139,7 +1179,14 @@ function readSettingsUI() {
 }
 
 function openSettings() {
-  configSnapshot = { ...config, laneColors: [...config.laneColors] };
+  // laneKeys / laneColors は参照共有だとプレビュー中の書き換えで
+  // スナップショットまで汚染されるため、配列はコピーする。
+  configSnapshot = {
+    ...config,
+    laneKeys: [...config.laneKeys],
+    laneColors: [...config.laneColors],
+  };
+  settingsDirty = false;
   // 前回の未確定プレビューが残らないようにする
   pendingBackground = null;
 
@@ -1204,7 +1251,7 @@ function openSettings() {
   );
 
   const keyInputs = document.querySelectorAll(
-    "#laneKeyInputs input[type=text]",
+    "#laneKeyInputs input",
   );
   for (let l = 0; l < keyInputs.length; l++) {
     keyInputs[l].value = config.laneKeys[l] ?? "";
@@ -1218,12 +1265,17 @@ function openSettings() {
       DEFAULT_CONFIG.laneColors[l % DEFAULT_CONFIG.laneColors.length];
   }
 
+  // 値の代入で input/change が飛ぶ環境向けに、UI 反映後にもう一度クリアする
+  settingsDirty = false;
   showScreen("settings");
 }
 
 function onSettingsInput() {
+  settingsDirty = true;
   applyConfigToGame(readSettingsUI());
-  saveConfig(config);
+  // プレビュー用にメモリ上の config は更新するが、localStorage への確定保存は
+  // 「適用して閉じる」時のみ行う。キャンセルで閉じたときに空の laneKeys などが
+  // 永続化されるのを防ぐ。
 }
 
 function applySettings() {
@@ -1232,6 +1284,7 @@ function applySettings() {
   commitPendingBackground();
   saveConfig(config);
   configSnapshot = null; // 適用済みなので hide.bs.modal 側の巻き戻しを無効化
+  settingsDirty = false;
   settingsModal.hide();
 }
 
@@ -1241,12 +1294,16 @@ function applySettings() {
 // （適用時は applySettings() が configSnapshot を先に null にしているので二重には走らない）
 screenSettings.addEventListener("hide.bs.modal", () => {
   if (configSnapshot) {
-    applyConfigToGame(configSnapshot);
-    saveConfig(configSnapshot);
-    // 背景プレビューもスナップショット時点の表示へ戻す（config 文字列だけでなく
-    // 実際の画像/動画と <select> の選択状態も巻き戻す）
-    revertPendingBackground(configSnapshot.backgroundPreset ?? "");
+    if (settingsDirty) {
+      // ライブプレビューで書き換えた config をスナップショットへ戻し、
+      // 触る前の値を localStorage にも書き戻す。
+      applyConfigToGame(configSnapshot);
+      saveConfig(configSnapshot);
+      revertPendingBackground(configSnapshot.backgroundPreset ?? "");
+    }
+    // 何も変更していない場合はメモリも storage も触らない
     configSnapshot = null;
+    settingsDirty = false;
   }
 });
 
@@ -1261,8 +1318,8 @@ document.getElementById("accentColor")?.addEventListener("input", (e) => {
 document.getElementById("btnResetAccentColor")?.addEventListener(
   "click",
   () => {
+    settingsDirty = true;
     applyConfigToGame({ ...readSettingsUI(), accentColor: "" });
-    saveConfig(config);
     const acEl = document.getElementById("accentColor");
     if (acEl) {
       acEl.value = rgbToHex(getComputedStyle(document.body).color) || "#ffc107";
@@ -1278,8 +1335,8 @@ document.getElementById("judgeLineColor")?.addEventListener("input", (e) => {
 document.getElementById("btnResetJudgeLineColor")?.addEventListener(
   "click",
   () => {
+    settingsDirty = true;
     applyConfigToGame({ ...readSettingsUI(), judgeLineColor: "" });
-    saveConfig(config);
     const jlEl = document.getElementById("judgeLineColor");
     if (jlEl) {
       jlEl.value = rgbToHex(getComputedStyle(document.body).color) || "#ffffff";
@@ -1295,8 +1352,8 @@ document.getElementById("laneLineColor")?.addEventListener("input", (e) => {
 document.getElementById("btnResetLaneLineColor")?.addEventListener(
   "click",
   () => {
+    settingsDirty = true;
     applyConfigToGame({ ...readSettingsUI(), laneLineColor: "" });
-    saveConfig(config);
     const llEl = document.getElementById("laneLineColor");
     if (llEl) {
       llEl.value = rgbToHex(getComputedStyle(document.body).color) || "#ffffff";
@@ -1350,7 +1407,7 @@ document.getElementById("laneKeyInputs").addEventListener("keydown", (e) => {
   e.preventDefault();
   inp.value = e.key;
   const inputs = [
-    ...document.querySelectorAll("#laneKeyInputs input[type=text]"),
+    ...document.querySelectorAll("#laneKeyInputs input"),
   ];
   const next = inputs[inputs.indexOf(inp) + 1];
   if (next) next.focus();
@@ -1993,12 +2050,14 @@ function parseMidiLibraryTime(timeStr) {
 }
 
 const RANDOM_MIDI_MIN_SECONDS = 60;
+let randomMidiBusy = false;
 
 async function playRandomLongMidi() {
+  if (randomMidiBusy) return;
   const btn = document.getElementById("btnRandomMidi");
   const data = midiLibrary.fullData;
   if (!data || data.length === 0) {
-    alert("MIDI library is still loading. Please try again in a moment.");
+    alert(t("randomMidiStillLoading"));
     return;
   }
   const candidates = data.filter(
@@ -2006,13 +2065,14 @@ async function playRandomLongMidi() {
       row?.file && parseMidiLibraryTime(row.time) >= RANDOM_MIDI_MIN_SECONDS,
   );
   if (candidates.length === 0) {
-    alert("No songs longer than 1 minute found in the MIDI library.");
+    alert(t("randomMidiNoCandidates"));
     return;
   }
   const row = candidates[Math.floor(Math.random() * candidates.length)];
+  randomMidiBusy = true;
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "⏳ Loading…";
+    btn.textContent = t("randomMidiLoading");
   }
   try {
     const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
@@ -2020,11 +2080,12 @@ async function playRandomLongMidi() {
     await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
   } catch (err) {
     console.error("Random MIDI load failed:", err);
-    alert("Failed to load random MIDI: " + (err?.message || err));
+    alert(t("randomMidiLoadFailedPrefix") + (err?.message || err));
   } finally {
+    randomMidiBusy = false;
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "🎲 Random MIDI (≥1 min)";
+      btn.textContent = t("randomMidi");
     }
   }
 }
@@ -2442,24 +2503,43 @@ player.addEventListener("ended", () => {
 // 音声モードは beginAudioRound()（START_DELAY リードイン後に play）。
 // MIDIモードは startMidiPlayback()（split soundfont の読み込み → midy.start()）。
 
+// 連打で startMidiPlayback / analyzeThenPlay が並行起動しないようにする。
+// 成功時は gamePhase が "playing" に遷移するので再入は弾かれるが、
+// await 中はまだ ready/result のままなのでフラグが必要。
+let startOrReplayBusy = false;
+
 async function startOrReplay() {
+  if (startOrReplayBusy) return;
+  if (gamePhase !== "ready" && gamePhase !== "result") return;
+  startOrReplayBusy = true;
+  const startBtn = document.getElementById("btnBigStart");
+  const replayBtn = document.getElementById("btnBigReplay");
+  if (startBtn) startBtn.disabled = true;
+  if (replayBtn) replayBtn.disabled = true;
   try {
-    if (audioContext.state !== "running") await audioContext.resume();
-  } catch (err) {
-    console.error("audioContext.resume failed:", err);
-  }
-  if (mode === "audio") {
-    if (notesStale || !notesReady) {
-      await analyzeThenPlay();
-    } else {
-      beginAudioRound();
-    }
-  } else if (mode === "midi") {
     try {
-      await startMidiPlayback();
+      if (audioContext.state !== "running") await audioContext.resume();
     } catch (err) {
-      console.error("startMidiPlayback failed:", err);
+      console.error("audioContext.resume failed:", err);
     }
+    if (mode === "audio") {
+      if (notesStale || !notesReady) {
+        await analyzeThenPlay();
+      } else {
+        beginAudioRound();
+      }
+    } else if (mode === "midi") {
+      try {
+        await startMidiPlayback();
+      } catch (err) {
+        console.error("startMidiPlayback failed:", err);
+      }
+    }
+  } finally {
+    startOrReplayBusy = false;
+    // 遷移後は画面ごと隠れるので、戻ってきたときに押せるよう常に解除する
+    if (startBtn) startBtn.disabled = false;
+    if (replayBtn) replayBtn.disabled = false;
   }
 }
 
