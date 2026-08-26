@@ -799,6 +799,17 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                MIDI 缓存级别 <span id="cacheModeVal">5（分块）</span>
+              </label>
+              <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+              <div class="small text-muted mt-1">
+                级别越高，对复杂 MIDI 的缓存越积极（可能会占用更多内存）。
+                如果在 iOS 上播放 MIDI 时游戏崩溃，请将优化级别设置为 0。
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label">轨道按键</label>
               <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
                 <label class="lane-input-wrap">

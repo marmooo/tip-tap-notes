@@ -87,7 +87,26 @@ const DEFAULT_CONFIG = {
   // Canvas 解像度の上限（devicePixelRatio をこの値でキャップ）。
   // 既定 1 = 負荷を抑えて安定優先。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
   maxPixelRatio: 1,
+  // Midy の sample キャッシュ粒度。none → ads → adsr → note → segment → chunk。
+  // 高いほど複雑な MIDI で効率が良いが、iOS の OfflineAudioContext 不具合で落ちやすくなる。
+  cacheMode: "chunk",
 };
+
+// midy.cacheMode の段階（スライダー 0–5 と対応）
+const CACHE_MODES = ["none", "ads", "adsr", "note", "segment", "chunk"];
+
+function cacheModeIndex(mode) {
+  const i = CACHE_MODES.indexOf(mode);
+  return i >= 0 ? i : CACHE_MODES.indexOf("chunk");
+}
+
+function cacheModeLabel(modeOrIndex) {
+  const i = typeof modeOrIndex === "number"
+    ? modeOrIndex
+    : cacheModeIndex(modeOrIndex);
+  const clamped = Math.min(CACHE_MODES.length - 1, Math.max(0, i));
+  return `${clamped} (${CACHE_MODES[clamped]})`;
+}
 
 function loadConfig() {
   try {
@@ -116,6 +135,9 @@ let config = loadConfig();
 {
   const v = Number(config.maxPixelRatio);
   config.maxPixelRatio = Number.isFinite(v) ? Math.min(3, Math.max(1, v)) : 1;
+  if (!CACHE_MODES.includes(config.cacheMode)) {
+    config.cacheMode = DEFAULT_CONFIG.cacheMode;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -818,6 +840,10 @@ function applyConfigToGame(cfg) {
   config = cfg;
   // maxPixelRatio 変更時は実効 dpr を更新（構造変更時は後続の buildGame で反映）
   if (dprChanged) dpr = computeDpr();
+  // MIDI サンプルキャッシュ粒度（再生中でも次回ボイス生成から効く）
+  if (typeof midy !== "undefined" && CACHE_MODES.includes(config.cacheMode)) {
+    midy.cacheMode = config.cacheMode;
+  }
 
   if (mode === "audio" && laneOrDiffChanged) {
     // 音声モードは難易度/レーン数がビートマップ生成自体に影響するため、
@@ -1101,6 +1127,12 @@ function readSettingsUI() {
     maxPixelRatio: parseFloat(
       document.getElementById("maxPixelRatio")?.value ?? "1",
     ) || 1,
+    cacheMode: CACHE_MODES[
+      Math.min(
+        CACHE_MODES.length - 1,
+        Math.max(0, parseInt(gv("cacheMode"), 10) || 0),
+      )
+    ],
   };
 }
 
@@ -1123,6 +1155,11 @@ function openSettings() {
   st("scrollSpeedVal", config.scrollSpeed);
   sv("maxPixelRatio", config.maxPixelRatio ?? 1);
   st("maxPixelRatioVal", config.maxPixelRatio ?? 1);
+  {
+    const idx = cacheModeIndex(config.cacheMode);
+    sv("cacheMode", idx);
+    st("cacheModeVal", cacheModeLabel(idx));
+  }
   sv("difficulty", config.difficulty);
   const persEl = document.getElementById("perspectiveEnabled");
   if (persEl) persEl.checked = config.perspectiveEnabled ?? true;
@@ -1283,6 +1320,10 @@ document.getElementById("btnResetLaneLineColor")?.addEventListener(
         : e.target.value;
     }
   });
+});
+document.getElementById("cacheMode")?.addEventListener("input", (e) => {
+  const el = document.getElementById("cacheModeVal");
+  if (el) el.textContent = cacheModeLabel(parseInt(e.target.value, 10) || 0);
 });
 
 function goToStartScreen() {
@@ -1571,9 +1612,14 @@ function switchMode(next) {
 // MIDI playback
 // ---------------------------------------------------------------------------
 
+const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
-midy.cacheMode = "chunk";
+midy.cacheMode = CACHE_MODES.includes(config.cacheMode)
+  ? config.cacheMode
+  : (isIOS ? "none" : "chunk");
 midy.startDelay = START_DELAY;
 
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";

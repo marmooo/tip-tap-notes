@@ -791,6 +791,17 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                MIDI cache level <span id="cacheModeVal">5 (chunk)</span>
+              </label>
+              <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+              <div class="small text-muted mt-1">
+                Higher levels cache more aggressively for complex MIDI (may use more memory).
+                If the game crashes on iOS with MIDI, set the optimization level to 0.
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label">Lane keys</label>
               <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
                 <label class="lane-input-wrap">

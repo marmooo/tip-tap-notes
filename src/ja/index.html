@@ -814,6 +814,17 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label d-flex justify-content-between">
+                MIDIキャッシュレベル <span id="cacheModeVal">5（チャンク）</span>
+              </label>
+              <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+              <div class="small text-muted mt-1">
+                レベルが高いほど複雑なMIDIを積極的にキャッシュします（メモリ使用量が増える場合があります）。
+                iOSでMIDI再生中にゲームがクラッシュする場合は、最適化レベルを0に設定してください。
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label">レーンキー</label>
               <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
                 <label class="lane-input-wrap">
