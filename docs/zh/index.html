@@ -37,7 +37,7 @@ align-items-center justify-content-center mb-3" style=width:8rem;height:8rem;fon
 </label><input type=range class=form-range id=scrollSpeed min=150 max=1200 step=50 value=500></div><div class=mb-3><label class="form-label d-flex justify-content-between">画布分辨率（最大 DPR）<span id=maxPixelRatioVal>2</span>
 </label><input type=range class=form-range id=maxPixelRatio min=1 max=3 step=0.5 value=2><div class="small text-muted mt-1">根据设备像素比限制画布分辨率上限。
 数值越低越省内存，在移动设备上更稳定；
-数值越高在高分辨率屏幕上显示越清晰。默认值为 2。</div></div><div class=mb-3><label class="form-label d-flex justify-content-between">MIDI 缓存级别 <span id=cacheModeVal>5（分块）</span>
+数值越高在高分辨率屏幕上显示越清晰。默认值为 1。</div></div><div class=mb-3><label class="form-label d-flex justify-content-between">MIDI 缓存级别 <span id=cacheModeVal>5（分块）</span>
 </label><input type=range class=form-range id=cacheMode min=0 max=5 step=1 value=5><div class="small text-muted mt-1">级别越高，对复杂 MIDI 的缓存越积极（可能会占用更多内存）。
 如果在 iOS 上播放 MIDI 时游戏崩溃，请将优化级别设置为 0。</div></div><div class=mb-3><label class=form-label>轨道按键</label><div id=laneKeyInputs class="d-flex flex-wrap gap-2"><label class=lane-input-wrap><span class="small text-muted">1</span>
 <input maxlength=1 class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
