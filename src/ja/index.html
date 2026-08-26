@@ -760,264 +760,264 @@
 
         <!-- Settings -->
         <div class="modal" id="screenSettings" tabindex="-1"
-             aria-labelledby="screenSettingsLabel" aria-hidden="true">
+                                               aria-labelledby="screenSettingsLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content" id="settingsPanel">
 
               <div class="modal-header">
                 <h5 class="modal-title fw-bold text-warning-emphasis" id="screenSettingsLabel">⚙ 設定</h5>
                 <button type="button" class="btn-close" id="btnCloseSettings"
-                        data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
 
               <div class="modal-body" id="settingsBody">
 
-            <div class="mb-3">
-              <label class="form-label">難易度</label>
-              <select class="form-select form-select-sm" id="difficulty">
-                <option value="EASY">EASY — ≒1〜1.5 nps・同時押しなし（未経験者向け）</option>
-                <option value="BASIC">BASIC — ≒2〜3 nps・最大同時押し2（初心者向け）</option>
-                <option value="NORMAL" selected>NORMAL — ≒3〜4 nps・最大同時押し2（カジュアル）</option>
-                <option value="HARD">HARD — ≒4〜6 nps・最大同時押し3（経験者向け）</option>
-                <option value="EXPERT">EXPERT — ≒6〜9 nps・最大同時押し4（上級者向け）</option>
-              </select>
-              <div class="small text-muted mt-1">
-                ※同時押し数はレーン数が少ないと自動的に制限されます<br>
-                <span id="audioDiffNote" class="hidden">※音声モードでは難易度を変えると次回再生時に譜面を自動で再生成します。</span>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">難易度</label>
+                  <select class="form-select form-select-sm" id="difficulty">
+                    <option value="EASY">EASY — ≒1〜1.5 nps・同時押しなし（未経験者向け）</option>
+                    <option value="BASIC">BASIC — ≒2〜3 nps・最大同時押し2（初心者向け）</option>
+                    <option value="NORMAL" selected>NORMAL — ≒3〜4 nps・最大同時押し2（カジュアル）</option>
+                    <option value="HARD">HARD — ≒4〜6 nps・最大同時押し3（経験者向け）</option>
+                    <option value="EXPERT">EXPERT — ≒6〜9 nps・最大同時押し4（上級者向け）</option>
+                  </select>
+                  <div class="small text-muted mt-1">
+                    ※同時押し数はレーン数が少ないと自動的に制限されます<br>
+                    <span id="audioDiffNote" class="hidden">※音声モードでは難易度を変えると次回再生時に譜面を自動で再生成します。</span>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                レーン数 <span id="laneCountVal">4</span>
-              </label>
-              <input type="range" class="form-range" id="laneCount" min="2" max="8" step="1" value="4">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    レーン数 <span id="laneCountVal">4</span>
+                  </label>
+                  <input type="range" class="form-range" id="laneCount" min="2" max="8" step="1" value="4">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                スクロール速度 <span id="scrollSpeedVal">500</span>
-              </label>
-              <input type="range" class="form-range" id="scrollSpeed" min="150" max="1200" step="50" value="500">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    スクロール速度 <span id="scrollSpeedVal">500</span>
+                  </label>
+                  <input type="range" class="form-range" id="scrollSpeed" min="150" max="1200" step="50" value="500">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                Canvas解像度（最大DPR） <span id="maxPixelRatioVal">2</span>
-              </label>
-              <input type="range" class="form-range" id="maxPixelRatio" min="1" max="3" step="0.5" value="2">
-              <div class="small text-muted mt-1">
-                端末の devicePixelRatio に対する Canvas 解像度の上限です。
-                低いほどメモリ使用量が減りモバイルで安定しやすく、
-                高いほど高DPIディスプレイでくっきりします。既定値は 2。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    Canvas解像度（最大DPR） <span id="maxPixelRatioVal">2</span>
+                  </label>
+                  <input type="range" class="form-range" id="maxPixelRatio" min="1" max="3" step="0.5" value="2">
+                  <div class="small text-muted mt-1">
+                    端末の devicePixelRatio に対する Canvas 解像度の上限です。
+                    低いほどメモリ使用量が減りモバイルで安定しやすく、
+                    高いほど高DPIディスプレイでくっきりします。既定値は 2。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                MIDIキャッシュレベル <span id="cacheModeVal">5（チャンク）</span>
-              </label>
-              <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
-              <div class="small text-muted mt-1">
-                レベルが高いほど複雑なMIDIを積極的にキャッシュします（メモリ使用量が増える場合があります）。
-                iOSでMIDI再生中にゲームがクラッシュする場合は、最適化レベルを0に設定してください。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    MIDIキャッシュレベル <span id="cacheModeVal">5（チャンク）</span>
+                  </label>
+                  <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+                  <div class="small text-muted mt-1">
+                    レベルが高いほど複雑なMIDIを積極的にキャッシュします（メモリ使用量が増える場合があります）。
+                    iOSでMIDI再生中にゲームがクラッシュする場合は、最適化レベルを0に設定してください。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">レーンキー</label>
-              <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">1</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">2</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">3</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">4</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">5</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">6</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">7</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">8</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">レーンキー</label>
+                  <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">1</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">2</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">3</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">4</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">5</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">6</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">7</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">8</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">レーンカラー</label>
-              <div id="laneColorPickers" class="lane-color-grid">
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">1</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">2</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">3</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">4</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">5</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">6</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">7</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">8</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">レーンカラー</label>
+                  <div id="laneColorPickers" class="lane-color-grid">
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">1</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">2</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">3</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">4</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">5</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">6</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">7</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">8</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                レーンの不透明度 <span id="laneOpacityVal">0.35</span>
-              </label>
-              <input type="range" class="form-range" id="laneOpacity" min="0" max="1" step="0.05" value="0.35">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    レーンの不透明度 <span id="laneOpacityVal">0.35</span>
+                  </label>
+                  <input type="range" class="form-range" id="laneOpacity" min="0" max="1" step="0.05" value="0.35">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                ボタン文字色（アクセントカラー）
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="accentColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetAccentColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
-                </span>
-              </label>
-              <div class="small text-muted mt-1">
-                レーンキー・コンボ・判定・スコアなど、Canvas上の文字全体の色。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    ボタン文字色（アクセントカラー）
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="accentColor" class="form-control form-control-color"
+                                                           style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetAccentColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
+                    </span>
+                  </label>
+                  <div class="small text-muted mt-1">
+                    レーンキー・コンボ・判定・スコアなど、Canvas上の文字全体の色。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                判定ラインの色
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="judgeLineColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetJudgeLineColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
-                </span>
-              </label>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    判定ラインの色
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="judgeLineColor" class="form-control form-control-color"
+                                                              style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetJudgeLineColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
+                    </span>
+                  </label>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                レーン区切り線の色
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="laneLineColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetLaneLineColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
-                </span>
-              </label>
-              <div class="small text-muted mt-1">
-                背景画像で見えにくい場合はコントラストの強い色に。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    レーン区切り線の色
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="laneLineColor" class="form-control form-control-color"
+                                                             style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetLaneLineColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自動</button>
+                    </span>
+                  </label>
+                  <div class="small text-muted mt-1">
+                    背景画像で見えにくい場合はコントラストの強い色に。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                判定オフセット <span id="judgeOffsetVal">0ms</span>
-              </label>
-              <input type="range" class="form-range" id="judgeOffset"
-                     min="-200" max="200" step="5" value="0">
-              <div class="small text-muted mt-1">
-                音が遅ければ＋、早ければ−に調整。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    判定オフセット <span id="judgeOffsetVal">0ms</span>
+                  </label>
+                  <input type="range" class="form-range" id="judgeOffset"
+                                                         min="-200" max="200" step="5" value="0">
+                  <div class="small text-muted mt-1">
+                    音が遅ければ＋、早ければ−に調整。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="perspectiveEnabled" checked>
-                <label class="form-check-label" for="perspectiveEnabled">遠近感（画面上側を狭く表示）</label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="perspectiveEnabled" checked>
+                    <label class="form-check-label" for="perspectiveEnabled">遠近感（画面上側を狭く表示）</label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">背景</label>
-              <select class="form-select form-select-sm mb-2" id="backgroundPreset">
-                <option value="">なし</option>
-                <option value="/tip-tap-notes/data/nasa-blue-marble.webp">Image 1: NASA Blue Marble</option>
-                <option value="/tip-tap-notes/data/nasa-galaxy.webp">Image 2: NASA Galaxy</option>
-                <option value="/tip-tap-notes/data/nasa-drift-ice.webp">Image 3: NASA Drift Ice</option>
-                <option value="/tip-tap-notes/data/japan-river.webp">Image 4: Japan River</option>
-                <option value="/tip-tap-notes/data/japan-lake.webp">Image 5: Japan Lake</option>
-                <option value="/tip-tap-notes/data/japan-sky.webp" selected>Image 6: Japan Sky</option>
-                <option value="/tip-tap-notes/data/japan-mountain.webp">Image 7: Japan Mountain</option>
-                <option value="/tip-tap-notes/data/japan-pagoda.webp">Image 8: Japan Pagoda</option>
-                <option value="/tip-tap-notes/data/japan-cave.webp">Image 9: Japan Cave</option>
-                <option value="/tip-tap-notes/data/japan-shrine.webp">Image 10: Japan Shrine</option>
-                <option value="/tip-tap-notes/data/fantasy-forest.webp">Image 11: Fantasy Forest</option>
-                <option value="/tip-tap-notes/data/fantasy-lake.webp">Image 12: Fantasy Lake</option>
-                <option value="/tip-tap-notes/data/fantasy-sea.webp">Image 13: Fantasy Sea</option>
-                <option value="/tip-tap-notes/data/fantasy-flare.webp">Image 14: Fantasy Flare</option>
-                <option value="/tip-tap-notes/data/cyber-space.webp">Image 15: Cyber Space</option>
-                <option value="/tip-tap-notes/data/cyber-network.webp">Image 16: Cyber Network</option>
-                <option value="/tip-tap-notes/data/cyber-magic.webp">Image 17: Cyber Magic</option>
-                <option value="/tip-tap-notes/data/movie-earth.webm">Movie 1: Earth</option>
-                <option value="/tip-tap-notes/data/movie-matrix-code.webm">Movie 2: Matrix Code</option>
-                <option value="/tip-tap-notes/data/movie-number-stream.webm">Movie 3: Number Stream</option>
-                <option value="/tip-tap-notes/data/movie-water.webm">Movie 4: Water</option>
-                <option value="custom">カスタムファイル…</option>
-              </select>
-              <input class="form-control form-control-sm"
-                     type="file" id="backgroundFile" accept="image/*,video/*">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">背景</label>
+                  <select class="form-select form-select-sm mb-2" id="backgroundPreset">
+                    <option value="">なし</option>
+                    <option value="/tip-tap-notes/data/nasa-blue-marble.webp">Image 1: NASA Blue Marble</option>
+                    <option value="/tip-tap-notes/data/nasa-galaxy.webp">Image 2: NASA Galaxy</option>
+                    <option value="/tip-tap-notes/data/nasa-drift-ice.webp">Image 3: NASA Drift Ice</option>
+                    <option value="/tip-tap-notes/data/japan-river.webp">Image 4: Japan River</option>
+                    <option value="/tip-tap-notes/data/japan-lake.webp">Image 5: Japan Lake</option>
+                    <option value="/tip-tap-notes/data/japan-sky.webp" selected>Image 6: Japan Sky</option>
+                    <option value="/tip-tap-notes/data/japan-mountain.webp">Image 7: Japan Mountain</option>
+                    <option value="/tip-tap-notes/data/japan-pagoda.webp">Image 8: Japan Pagoda</option>
+                    <option value="/tip-tap-notes/data/japan-cave.webp">Image 9: Japan Cave</option>
+                    <option value="/tip-tap-notes/data/japan-shrine.webp">Image 10: Japan Shrine</option>
+                    <option value="/tip-tap-notes/data/fantasy-forest.webp">Image 11: Fantasy Forest</option>
+                    <option value="/tip-tap-notes/data/fantasy-lake.webp">Image 12: Fantasy Lake</option>
+                    <option value="/tip-tap-notes/data/fantasy-sea.webp">Image 13: Fantasy Sea</option>
+                    <option value="/tip-tap-notes/data/fantasy-flare.webp">Image 14: Fantasy Flare</option>
+                    <option value="/tip-tap-notes/data/cyber-space.webp">Image 15: Cyber Space</option>
+                    <option value="/tip-tap-notes/data/cyber-network.webp">Image 16: Cyber Network</option>
+                    <option value="/tip-tap-notes/data/cyber-magic.webp">Image 17: Cyber Magic</option>
+                    <option value="/tip-tap-notes/data/movie-earth.webm">Movie 1: Earth</option>
+                    <option value="/tip-tap-notes/data/movie-matrix-code.webm">Movie 2: Matrix Code</option>
+                    <option value="/tip-tap-notes/data/movie-number-stream.webm">Movie 3: Number Stream</option>
+                    <option value="/tip-tap-notes/data/movie-water.webm">Movie 4: Water</option>
+                    <option value="custom">カスタムファイル…</option>
+                  </select>
+                  <input class="form-control form-control-sm"
+                         type="file" id="backgroundFile" accept="image/*,video/*">
+                </div>
 
-            <hr class="my-4">
+                <hr class="my-4">
 
-            <div class="mb-3">
-              <label class="form-label">リセット</label>
-              <div>
-                <button type="button" id="btnResetAllSettings" class="btn btn-sm btn-outline-danger">
-                  すべての設定をリセット
-                </button>
-              </div>
-              <div class="small text-muted mt-1">
-                保存されているすべての設定（テーマ、色、キー、カスタム背景など）を消去して、ページを再読み込みします。
-                この操作は元に戻せません。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">リセット</label>
+                  <div>
+                    <button type="button" id="btnResetAllSettings" class="btn btn-sm btn-outline-danger">
+                      すべての設定をリセット
+                    </button>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    保存されているすべての設定（テーマ、色、キー、カスタム背景など）を消去して、ページを再読み込みします。
+                    この操作は元に戻せません。
+                  </div>
+                </div>
 
               </div><!-- /settingsBody (modal-body) -->
 
               <div class="modal-footer" id="settingsFooter">
                 <button type="button" id="btnCancelSettings" class="btn btn-outline-secondary"
-                        data-bs-dismiss="modal">キャンセル</button>
+                                                             data-bs-dismiss="modal">キャンセル</button>
                 <button type="button" id="btnApplySettings" class="btn btn-primary">適用して閉じる</button>
               </div>
 

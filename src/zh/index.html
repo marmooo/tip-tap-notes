@@ -745,264 +745,264 @@
 
         <!-- 设置 -->
         <div class="modal" id="screenSettings" tabindex="-1"
-             aria-labelledby="screenSettingsLabel" aria-hidden="true">
+                                               aria-labelledby="screenSettingsLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content" id="settingsPanel">
 
               <div class="modal-header">
                 <h5 class="modal-title fw-bold text-warning-emphasis" id="screenSettingsLabel">⚙ 设置</h5>
                 <button type="button" class="btn-close" id="btnCloseSettings"
-                        data-bs-dismiss="modal" aria-label="关闭"></button>
+                                                        data-bs-dismiss="modal" aria-label="关闭"></button>
               </div>
 
               <div class="modal-body" id="settingsBody">
 
-            <div class="mb-3">
-              <label class="form-label">难度</label>
-              <select class="form-select form-select-sm" id="difficulty">
-                <option value="EASY">简单 — 约 1–1.5 nps，无同时按键（新手）</option>
-                <option value="BASIC">初级 — 约 2–3 nps，最多同时 2 个（入门）</option>
-                <option value="NORMAL" selected>普通 — 约 3–4 nps，最多同时 2 个（休闲）</option>
-                <option value="HARD">困难 — 约 4–6 nps，最多同时 3 个（熟练）</option>
-                <option value="EXPERT">专家 — 约 6–9 nps，最多同时 4 个（高级）</option>
-              </select>
-              <div class="small text-muted mt-1">
-                ※ 当轨道数较少时，会自动限制同时出现的音符数<br>
-                <span id="audioDiffNote" class="hidden">※ 在音频模式下，更改难度后将在下次游玩时重新生成谱面。</span>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">难度</label>
+                  <select class="form-select form-select-sm" id="difficulty">
+                    <option value="EASY">简单 — 约 1–1.5 nps，无同时按键（新手）</option>
+                    <option value="BASIC">初级 — 约 2–3 nps，最多同时 2 个（入门）</option>
+                    <option value="NORMAL" selected>普通 — 约 3–4 nps，最多同时 2 个（休闲）</option>
+                    <option value="HARD">困难 — 约 4–6 nps，最多同时 3 个（熟练）</option>
+                    <option value="EXPERT">专家 — 约 6–9 nps，最多同时 4 个（高级）</option>
+                  </select>
+                  <div class="small text-muted mt-1">
+                    ※ 当轨道数较少时，会自动限制同时出现的音符数<br>
+                    <span id="audioDiffNote" class="hidden">※ 在音频模式下，更改难度后将在下次游玩时重新生成谱面。</span>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                轨道数 <span id="laneCountVal">4</span>
-              </label>
-              <input type="range" class="form-range" id="laneCount" min="2" max="8" step="1" value="4">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    轨道数 <span id="laneCountVal">4</span>
+                  </label>
+                  <input type="range" class="form-range" id="laneCount" min="2" max="8" step="1" value="4">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                卷动速度 <span id="scrollSpeedVal">500</span>
-              </label>
-              <input type="range" class="form-range" id="scrollSpeed" min="150" max="1200" step="50" value="500">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    卷动速度 <span id="scrollSpeedVal">500</span>
+                  </label>
+                  <input type="range" class="form-range" id="scrollSpeed" min="150" max="1200" step="50" value="500">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                画布分辨率（最大 DPR）<span id="maxPixelRatioVal">2</span>
-              </label>
-              <input type="range" class="form-range" id="maxPixelRatio" min="1" max="3" step="0.5" value="2">
-              <div class="small text-muted mt-1">
-                根据设备像素比限制画布分辨率上限。
-                数值越低越省内存，在移动设备上更稳定；
-                数值越高在高分辨率屏幕上显示越清晰。默认值为 2。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    画布分辨率（最大 DPR）<span id="maxPixelRatioVal">2</span>
+                  </label>
+                  <input type="range" class="form-range" id="maxPixelRatio" min="1" max="3" step="0.5" value="2">
+                  <div class="small text-muted mt-1">
+                    根据设备像素比限制画布分辨率上限。
+                    数值越低越省内存，在移动设备上更稳定；
+                    数值越高在高分辨率屏幕上显示越清晰。默认值为 2。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                MIDI 缓存级别 <span id="cacheModeVal">5（分块）</span>
-              </label>
-              <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
-              <div class="small text-muted mt-1">
-                级别越高，对复杂 MIDI 的缓存越积极（可能会占用更多内存）。
-                如果在 iOS 上播放 MIDI 时游戏崩溃，请将优化级别设置为 0。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    MIDI 缓存级别 <span id="cacheModeVal">5（分块）</span>
+                  </label>
+                  <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+                  <div class="small text-muted mt-1">
+                    级别越高，对复杂 MIDI 的缓存越积极（可能会占用更多内存）。
+                    如果在 iOS 上播放 MIDI 时游戏崩溃，请将优化级别设置为 0。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">轨道按键</label>
-              <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">1</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">2</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">3</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">4</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">5</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">6</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">7</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">8</span>
-                  <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
-                </label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">轨道按键</label>
+                  <div id="laneKeyInputs" class="d-flex flex-wrap gap-2">
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">1</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">2</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">3</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">4</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">5</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">6</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">7</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">8</span>
+                      <input type="text" maxlength="1" class="form-control form-control-sm bg-dark text-light border-secondary text-center font-monospace fw-bold lane-key-input">
+                    </label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">轨道颜色</label>
-              <div id="laneColorPickers" class="lane-color-grid">
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">1</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">2</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">3</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">4</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">5</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">6</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">7</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-                <label class="lane-input-wrap">
-                  <span class="small text-muted">8</span>
-                  <input type="color" class="form-control form-control-color">
-                </label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">轨道颜色</label>
+                  <div id="laneColorPickers" class="lane-color-grid">
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">1</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">2</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">3</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">4</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">5</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">6</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">7</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                    <label class="lane-input-wrap">
+                      <span class="small text-muted">8</span>
+                      <input type="color" class="form-control form-control-color">
+                    </label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                轨道透明度 <span id="laneOpacityVal">0.35</span>
-              </label>
-              <input type="range" class="form-range" id="laneOpacity" min="0" max="1" step="0.05" value="0.35">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    轨道透明度 <span id="laneOpacityVal">0.35</span>
+                  </label>
+                  <input type="range" class="form-range" id="laneOpacity" min="0" max="1" step="0.05" value="0.35">
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                按钮文字颜色（强调色）
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="accentColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetAccentColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
-                </span>
-              </label>
-              <div class="small text-muted mt-1">
-                画布中所有文字的颜色：轨道按键、连击数、判定、分数等。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    按钮文字颜色（强调色）
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="accentColor" class="form-control form-control-color"
+                                                           style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetAccentColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
+                    </span>
+                  </label>
+                  <div class="small text-muted mt-1">
+                    画布中所有文字的颜色：轨道按键、连击数、判定、分数等。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                判定线颜色
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="judgeLineColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetJudgeLineColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
-                </span>
-              </label>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    判定线颜色
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="judgeLineColor" class="form-control form-control-color"
+                                                              style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetJudgeLineColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
+                    </span>
+                  </label>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between align-items-center mb-0">
-                轨道分隔线颜色
-                <span class="d-flex align-items-center gap-1">
-                  <input type="color" id="laneLineColor" class="form-control form-control-color"
-                         style="width:2.5em;height:1.8em;padding:2px;">
-                  <button type="button" id="btnResetLaneLineColor"
-                          class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
-                </span>
-              </label>
-              <div class="small text-muted mt-1">
-                如果在背景图片上不易看清，请使用对比度更高的颜色。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-0">
+                    轨道分隔线颜色
+                    <span class="d-flex align-items-center gap-1">
+                      <input type="color" id="laneLineColor" class="form-control form-control-color"
+                                                             style="width:2.5em;height:1.8em;padding:2px;">
+                      <button type="button" id="btnResetLaneLineColor"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2">自动</button>
+                    </span>
+                  </label>
+                  <div class="small text-muted mt-1">
+                    如果在背景图片上不易看清，请使用对比度更高的颜色。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label d-flex justify-content-between">
-                判定偏移 <span id="judgeOffsetVal">0ms</span>
-              </label>
-              <input type="range" class="form-range" id="judgeOffset"
-                     min="-200" max="200" step="5" value="0">
-              <div class="small text-muted mt-1">
-                如果音频延迟请增大数值，提前则减小数值。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label d-flex justify-content-between">
+                    判定偏移 <span id="judgeOffsetVal">0ms</span>
+                  </label>
+                  <input type="range" class="form-range" id="judgeOffset"
+                                                         min="-200" max="200" step="5" value="0">
+                  <div class="small text-muted mt-1">
+                    如果音频延迟请增大数值，提前则减小数值。
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="perspectiveEnabled" checked>
-                <label class="form-check-label" for="perspectiveEnabled">透视效果（顶部更窄）</label>
-              </div>
-            </div>
+                <div class="mb-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="perspectiveEnabled" checked>
+                    <label class="form-check-label" for="perspectiveEnabled">透视效果（顶部更窄）</label>
+                  </div>
+                </div>
 
-            <div class="mb-3">
-              <label class="form-label">背景</label>
-              <select class="form-select form-select-sm mb-2" id="backgroundPreset">
-                <option value="">无</option>
-                <option value="/tip-tap-notes/data/nasa-blue-marble.webp">图片 1：NASA 蓝色弹珠</option>
-                <option value="/tip-tap-notes/data/nasa-galaxy.webp">图片 2：NASA 星系</option>
-                <option value="/tip-tap-notes/data/nasa-drift-ice.webp">图片 3：NASA 浮冰</option>
-                <option value="/tip-tap-notes/data/japan-river.webp">图片 4：日本河流</option>
-                <option value="/tip-tap-notes/data/japan-lake.webp">图片 5：日本湖泊</option>
-                <option value="/tip-tap-notes/data/japan-sky.webp" selected>图片 6：日本天空</option>
-                <option value="/tip-tap-notes/data/japan-mountain.webp">图片 7：日本山脉</option>
-                <option value="/tip-tap-notes/data/japan-pagoda.webp">图片 8：日本佛塔</option>
-                <option value="/tip-tap-notes/data/japan-cave.webp">图片 9：日本洞窟</option>
-                <option value="/tip-tap-notes/data/japan-shrine.webp">图片 10：日本神社</option>
-                <option value="/tip-tap-notes/data/fantasy-forest.webp">图片 11：奇幻森林</option>
-                <option value="/tip-tap-notes/data/fantasy-lake.webp">图片 12：奇幻湖泊</option>
-                <option value="/tip-tap-notes/data/fantasy-sea.webp">图片 13：奇幻海洋</option>
-                <option value="/tip-tap-notes/data/fantasy-flare.webp">图片 14：奇幻光耀</option>
-                <option value="/tip-tap-notes/data/cyber-space.webp">图片 15：赛博空间</option>
-                <option value="/tip-tap-notes/data/cyber-network.webp">图片 16：赛博网络</option>
-                <option value="/tip-tap-notes/data/cyber-magic.webp">图片 17：赛博魔法</option>
-                <option value="/tip-tap-notes/data/movie-earth.webm">影片 1：地球</option>
-                <option value="/tip-tap-notes/data/movie-matrix-code.webm">影片 2：矩阵代码</option>
-                <option value="/tip-tap-notes/data/movie-number-stream.webm">影片 3：数字流</option>
-                <option value="/tip-tap-notes/data/movie-water.webm">影片 4：水</option>
-                <option value="custom">自定义文件…</option>
-              </select>
-              <input class="form-control form-control-sm"
-                     type="file" id="backgroundFile" accept="image/*,video/*">
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">背景</label>
+                  <select class="form-select form-select-sm mb-2" id="backgroundPreset">
+                    <option value="">无</option>
+                    <option value="/tip-tap-notes/data/nasa-blue-marble.webp">图片 1：NASA 蓝色弹珠</option>
+                    <option value="/tip-tap-notes/data/nasa-galaxy.webp">图片 2：NASA 星系</option>
+                    <option value="/tip-tap-notes/data/nasa-drift-ice.webp">图片 3：NASA 浮冰</option>
+                    <option value="/tip-tap-notes/data/japan-river.webp">图片 4：日本河流</option>
+                    <option value="/tip-tap-notes/data/japan-lake.webp">图片 5：日本湖泊</option>
+                    <option value="/tip-tap-notes/data/japan-sky.webp" selected>图片 6：日本天空</option>
+                    <option value="/tip-tap-notes/data/japan-mountain.webp">图片 7：日本山脉</option>
+                    <option value="/tip-tap-notes/data/japan-pagoda.webp">图片 8：日本佛塔</option>
+                    <option value="/tip-tap-notes/data/japan-cave.webp">图片 9：日本洞窟</option>
+                    <option value="/tip-tap-notes/data/japan-shrine.webp">图片 10：日本神社</option>
+                    <option value="/tip-tap-notes/data/fantasy-forest.webp">图片 11：奇幻森林</option>
+                    <option value="/tip-tap-notes/data/fantasy-lake.webp">图片 12：奇幻湖泊</option>
+                    <option value="/tip-tap-notes/data/fantasy-sea.webp">图片 13：奇幻海洋</option>
+                    <option value="/tip-tap-notes/data/fantasy-flare.webp">图片 14：奇幻光耀</option>
+                    <option value="/tip-tap-notes/data/cyber-space.webp">图片 15：赛博空间</option>
+                    <option value="/tip-tap-notes/data/cyber-network.webp">图片 16：赛博网络</option>
+                    <option value="/tip-tap-notes/data/cyber-magic.webp">图片 17：赛博魔法</option>
+                    <option value="/tip-tap-notes/data/movie-earth.webm">影片 1：地球</option>
+                    <option value="/tip-tap-notes/data/movie-matrix-code.webm">影片 2：矩阵代码</option>
+                    <option value="/tip-tap-notes/data/movie-number-stream.webm">影片 3：数字流</option>
+                    <option value="/tip-tap-notes/data/movie-water.webm">影片 4：水</option>
+                    <option value="custom">自定义文件…</option>
+                  </select>
+                  <input class="form-control form-control-sm"
+                         type="file" id="backgroundFile" accept="image/*,video/*">
+                </div>
 
-            <hr class="my-4">
+                <hr class="my-4">
 
-            <div class="mb-3">
-              <label class="form-label">重置</label>
-              <div>
-                <button type="button" id="btnResetAllSettings" class="btn btn-sm btn-outline-danger">
-                  重置所有设置
-                </button>
-              </div>
-              <div class="small text-muted mt-1">
-                清除所有已保存的设置（主题、颜色、按键、自定义背景等），然后重新加载页面。
-                此操作无法撤销。
-              </div>
-            </div>
+                <div class="mb-3">
+                  <label class="form-label">重置</label>
+                  <div>
+                    <button type="button" id="btnResetAllSettings" class="btn btn-sm btn-outline-danger">
+                      重置所有设置
+                    </button>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    清除所有已保存的设置（主题、颜色、按键、自定义背景等），然后重新加载页面。
+                    此操作无法撤销。
+                  </div>
+                </div>
 
               </div><!-- /settingsBody (modal-body) -->
 
               <div class="modal-footer" id="settingsFooter">
                 <button type="button" id="btnCancelSettings" class="btn btn-outline-secondary"
-                        data-bs-dismiss="modal">取消</button>
+                                                             data-bs-dismiss="modal">取消</button>
                 <button type="button" id="btnApplySettings" class="btn btn-primary">应用并关闭</button>
               </div>
 
