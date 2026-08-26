@@ -35,7 +35,7 @@ align-items-center justify-content-center mb-3" style=width:8rem;height:8rem;fon
 <select class="form-select form-select-sm" id=difficulty><option value=EASY>EASY — ≒1〜1.5 nps・同時押しなし（未経験者向け）<option value=BASIC>BASIC — ≒2〜3 nps・最大同時押し2（初心者向け）<option value=NORMAL selected>NORMAL — ≒3〜4 nps・最大同時押し2（カジュアル）<option value=HARD>HARD — ≒4〜6 nps・最大同時押し3（経験者向け）<option value=EXPERT>EXPERT — ≒6〜9 nps・最大同時押し4（上級者向け）</select><div class="small text-muted mt-1">※同時押し数はレーン数が少ないと自動的に制限されます<br><span id=audioDiffNote class=hidden>※音声モードでは難易度を変えると次回再生時に譜面を自動で再生成します。</span></div></div><div class=mb-3><label class="form-label d-flex justify-content-between">レーン数 <span id=laneCountVal>4</span>
 </label><input type=range class=form-range id=laneCount min=2 max=8 step=1 value=4></div><div class=mb-3><label class="form-label d-flex justify-content-between">スクロール速度 <span id=scrollSpeedVal>500</span>
 </label><input type=range class=form-range id=scrollSpeed min=150 max=1200 step=50 value=500></div><div class=mb-3><label class="form-label d-flex justify-content-between">Canvas解像度（最大DPR） <span id=maxPixelRatioVal>2</span>
-</label><input type=range class=form-range id=maxPixelRatio min=1 max=3 step=0.5 value=2><div class="small text-muted mt-1">端末の devicePixelRatio に対する Canvas 解像度の上限です。
+</label><input type=range class=form-range id=maxPixelRatio min=1 max=3 step=0.5 value=2><div class="small text-muted mt-1">端末のdevicePixelRatioに対するCanvas解像度の上限です。
 低いほどメモリ使用量が減りモバイルで安定しやすく、
 高いほど高DPIディスプレイでくっきりします。既定値は 1。</div></div><div class=mb-3><label class="form-label d-flex justify-content-between">MIDIキャッシュレベル <span id=cacheModeVal>5（チャンク）</span>
 </label><input type=range class=form-range id=cacheMode min=0 max=5 step=1 value=5><div class="small text-muted mt-1">レベルが高いほど複雑なMIDIを積極的にキャッシュします（メモリ使用量が増える場合があります）。
@@ -87,7 +87,7 @@ iOSでMIDI再生中にゲームがクラッシュする場合は、最適化レ�
 <span data-key=beatmapGenerationFailedPrefix>譜面生成に失敗しました: </span><span data-key=audioNotLoaded>音声が読み込まれていません</span>
 <span data-key=analyzeTimeout>解析がタイムアウトしました（{seconds}秒）。Workerがクラッシュした可能性があります。</span>
 <span data-key=noOnsetDetected>有効なオンセット（音の立ち上がり）が検出できませんでした。無音・極端に短い・音量が小さい音声の可能性があります。</span>
-<span data-key=analyzeWorkerErrorPrefix>解析Workerでエラーが発生しました: </span><span data-key=analyzeWorkerErrorUnknown>解析Workerでエラーが発生しました（詳細不明。コンソールを確認してください）</span>
+<span data-key=analyzeWorkerErrorPrefix>解析Workerでエラーが発生しました: </span><span data-key=analyzeWorkerErrorUnknown>解析Workerでエラーが発生しました（詳細不明、コンソールを確認してください）</span>
 <span data-key=soundFontLoadFailed>（読込失敗）</span>
 <span data-key=stage-stft>周波数解析中…</span>
 <span data-key=stage-onset>オンセット検出中…</span>
