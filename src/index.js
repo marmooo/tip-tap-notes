@@ -62,6 +62,8 @@ const ICON_PLAY =
 // Config
 // ---------------------------------------------------------------------------
 
+const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const DEFAULT_CONFIG = {
   laneCount: 4,
   scrollSpeed: 500,
@@ -89,7 +91,7 @@ const DEFAULT_CONFIG = {
   maxPixelRatio: 1,
   // Midy の sample キャッシュ粒度。none → ads → adsr → note → segment → chunk。
   // 高いほど複雑な MIDI で効率が良いが、iOS の OfflineAudioContext 不具合で落ちやすくなる。
-  cacheMode: "chunk",
+  cacheMode: isIOS ? "none" : "chunk",
 };
 
 // midy.cacheMode の段階（スライダー 0–5 と対応）
@@ -1635,14 +1637,11 @@ function switchMode(next) {
 // MIDI playback
 // ---------------------------------------------------------------------------
 
-const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) ||
-  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
 midy.cacheMode = CACHE_MODES.includes(config.cacheMode)
   ? config.cacheMode
-  : (isIOS ? "none" : "chunk");
+  : "chunk";
 midy.startDelay = START_DELAY;
 
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";
