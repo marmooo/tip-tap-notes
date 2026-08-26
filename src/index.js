@@ -1359,6 +1359,29 @@ document.getElementById("btnApplySettings").addEventListener(
   applySettings,
 );
 
+// 設定のリセット: localStorage の config / テーマと、IndexedDB（背景ファイル）を
+// まるごと消してリロードする。個別キーの削除ではなく deleteDatabase() で
+// データベースごと消すことで、将来 store が増えても取りこぼさないようにする。
+document.getElementById("btnResetAllSettings")?.addEventListener(
+  "click",
+  async () => {
+    localStorage.removeItem("TipTapNotesConfig");
+    localStorage.removeItem("darkMode");
+    try {
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.deleteDatabase(BG_DB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        // 他タブでDBが開いたままだと即座には消えないが、リロード自体は続行する
+        req.onblocked = () => resolve();
+      });
+    } catch (err) {
+      console.error("IndexedDB のリセットに失敗:", err);
+    }
+    location.reload();
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Dark mode
 // ---------------------------------------------------------------------------
