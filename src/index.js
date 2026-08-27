@@ -383,13 +383,9 @@ function currentGameTime() {
     if (now < _resumeStabilizeMinUntil) {
       return approx;
     }
-    // 解除後に midy / AudioContext がまだ止まっている間だけ壁時計を継続。
-    // 通常再生中は midy.isPaused=false かつ context=running なので startDelay は従来通り。
-    const engineFrozen = midy.isPaused ||
-      (typeof audioContext !== "undefined" &&
-        audioContext &&
-        audioContext.state !== "running");
-    if (engineFrozen && _resumeBasePerf > 0) {
+    // UI は再生中なのに midy がまだ pause のときだけ壁時計を継続（音復帰待ち）。
+    // 通常再生・startDelay 中は midy.isPaused=false なので従来通り real を使う。
+    if (midy.isPaused && _resumeBasePerf > 0) {
       return approx;
     }
     const real = midy.currentTime() - START_DELAY;
@@ -397,16 +393,10 @@ function currentGameTime() {
       now < _resumeStabilizeMaxUntil &&
       Math.abs(real - approx) > RESUME_STABILIZE_TOLERANCE_SEC
     ) {
-      return approx; // 実測値がまだ近似値と乖離＝startTime未確定とみなす
-    }
-    // 実測が壁時計より大きく遅れている＝時刻凍結。startDelay 中は real が進むのでここには来ない。
-    if (_resumeBasePerf > 0 && real + 0.08 < approx) {
       return approx;
     }
     return real;
   }
-  // 音声モード: リードイン中は壁時計で -START_DELAY → 0 を進め、
-  // 再生開始後は <audio> の再生位置をそのまま使う（ノート時刻と一致）。
   if (_audioLeadIn) {
     if (isPaused) return _pausedAt;
     return (performance.now() - _audioLeadInStartPerf) / 1000 - START_DELAY;
@@ -843,8 +833,6 @@ function beginPlayback() {
   soundFontModal.hide();
   settingsModal.hide();
   userInitiatedMidiPause = false;
-  resumeGuardUntil = 0;
-  stopRecoverLoop();
   isPaused = false;
   showPlayHud();
   setWrapHeight(); // gamePhase="playing" になったので、ここでキャンバスを画面いっぱいに広げる
@@ -1499,7 +1487,7 @@ document.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     if (gamePhase === "playing") {
       e.preventDefault();
-      togglePause().catch((err) => console.error("togglePause failed:", err));
+      togglePause();
     } else if (gamePhase === "ready" || gamePhase === "result") {
       e.preventDefault();
       startOrReplay();
@@ -1608,91 +1596,31 @@ function scheduleAudioLeadInEnd(remainingSec) {
 
 // ---------------------------------------------------------------------------
 // iOS 背面復帰
-// await resume が本筋。ただし Promise がハングし得るので timeout 付き。
-// 「少し動いて止まる」= 解除後に凍結した midy.currentTime へ切り替わるため、
-// エンジン復帰まで currentGameTime は壁時計を使い続ける（上記）。
+//
+// 音を戻すには、クリック/タップの「同期スタック」内で audioContext.resume() を
+// 呼ぶ必要がある。await の後だとユーザージェスチャ扱いでなくなり無音のままになる。
+// ポーズボタンが死ぬのは、async のハングや midy.pause 往復の競合が原因になりやすい。
+// → 解除は同期で UI/rAF を戻し、音は同期 kick + 短いフォローアップのみ。
 // ---------------------------------------------------------------------------
 
 let resumeGuardUntil = 0;
-let lastTogglePauseAt = 0;
-let recoverTimerId = null;
 
-function withTimeout(promise, ms, label) {
-  if (!promise || typeof promise.then !== "function") {
-    return Promise.resolve(promise);
-  }
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(
-      () => reject(new Error(`${label || "async"} timed out after ${ms}ms`)),
-      ms,
-    );
-    promise.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
-}
-
-async function ensureAudioRunning() {
-  if (!audioContext || audioContext.state === "running") return true;
+function kickAudioContextSync() {
+  if (!audioContext) return;
   try {
-    await withTimeout(audioContext.resume(), 800, "audioContext.resume");
+    const p = audioContext.resume();
+    if (p && typeof p.catch === "function") {
+      p.catch((err) => console.error("audioContext.resume failed:", err));
+    }
   } catch (err) {
-    console.error(err);
+    console.error("audioContext.resume failed:", err);
   }
-  return audioContext.state === "running";
-}
-
-function stopRecoverLoop() {
-  if (recoverTimerId !== null) {
-    clearInterval(recoverTimerId);
-    recoverTimerId = null;
-  }
-}
-
-/** 解除後、エンジンが本当に動き出すまで resume を再試行 */
-function startRecoverLoop() {
-  stopRecoverLoop();
-  let n = 0;
-  recoverTimerId = setInterval(() => {
-    n++;
-    if (isPaused || gamePhase !== "playing" || n > 30) {
-      stopRecoverLoop();
-      return;
-    }
-    ensureAudioRunning().catch(() => {});
-    if (mode === "midi") {
-      try {
-        if (midy.isPaused) {
-          const r = midy.resume();
-          if (r && typeof r.catch === "function") r.catch(() => {});
-        } else if (audioContext.state === "running") {
-          stopRecoverLoop();
-        }
-      } catch {
-        /* ignore */
-      }
-    } else if (mode === "audio" && !_audioLeadIn) {
-      if (player.paused) {
-        player.play().catch(() => {});
-      } else {
-        stopRecoverLoop();
-      }
-    }
-  }, 200);
 }
 
 function pauseForBackground() {
   if (gamePhase !== "playing" || isPaused) return;
   if (performance.now() < resumeGuardUntil) return;
 
-  stopRecoverLoop();
   try {
     _pausedAt = currentGameTime();
   } catch {
@@ -1727,76 +1655,71 @@ function pauseForBackground() {
   }
 }
 
-async function resumeFromPause() {
-  resumeGuardUntil = performance.now() + 4000;
+function resumeFromPause() {
+  // 遅延 paused で再ポーズしない
+  resumeGuardUntil = performance.now() + 2000;
   userInitiatedMidiPause = false;
 
-  // 壁時計基準を先にセットしてから UI を戻す（動いて止まるを防ぐ）
+  // ★ 同期: ユーザージェスチャ内で AudioContext を起こす（音復帰の本命）
+  kickAudioContextSync();
+
   _resumeBaseGameTime = _pausedAt;
   _resumeBasePerf = performance.now();
   _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
-  _resumeStabilizeMaxUntil = _resumeBasePerf + 4000;
+  _resumeStabilizeMaxUntil = _resumeBasePerf + RESUME_STABILIZE_MAX_MS;
 
+  // ★ 同期: UI とゲーム進行をすぐ戻す（ボタンが死なない）
   updatePauseUi(false);
   startRaf();
 
-  await ensureAudioRunning();
-
   if (mode === "midi") {
     try {
-      if (!midy.isPaused && isPaused === false) {
-        // 不整合: midy が playing 扱いでも時刻が止まっていることがある → 一旦 pause
-        // （isPaused は既に false）
-      }
-      if (!midy.isPaused) {
-        try {
-          userInitiatedMidiPause = true;
-          await withTimeout(Promise.resolve(midy.pause()), 400, "midy.pause");
-        } catch (err) {
-          console.error(err);
-        }
-        userInitiatedMidiPause = false;
-      }
+      // midy が pause 中なら resume。pause→resume の往復はしない（競合の元）
       if (midy.isPaused) {
-        await withTimeout(Promise.resolve(midy.resume()), 1500, "midy.resume");
+        const result = midy.resume();
+        if (result && typeof result.then === "function") {
+          result.then(
+            () => {
+              // 実測時刻へ乗り換える準備
+              _resumeBaseGameTime = currentGameTime();
+              _resumeBasePerf = performance.now();
+              _resumeStabilizeMinUntil = _resumeBasePerf +
+                RESUME_STABILIZE_MIN_MS;
+              _resumeStabilizeMaxUntil = _resumeBasePerf +
+                RESUME_STABILIZE_MAX_MS;
+            },
+            (err) => console.error("midy.resume failed:", err),
+          );
+        }
       }
     } catch (err) {
-      console.error("midi resume failed:", err);
+      console.error("midy.resume failed:", err);
     }
-  } else if (mode === "audio") {
+    // ジェスチャが切れる前にもう一度 kick（iOS で効くことがある）
+    kickAudioContextSync();
+    return;
+  }
+
+  if (mode === "audio") {
     if (_audioLeadIn) {
       _audioLeadInStartPerf = performance.now() -
         (_pausedAt + START_DELAY) * 1000;
       scheduleAudioLeadInEnd(Math.max(0, -_pausedAt));
-    } else {
-      try {
-        await withTimeout(player.play(), 1500, "player.play");
-      } catch (err) {
-        console.error("player.play failed:", err);
-      }
+      return;
     }
+    player.play().catch((err) => console.error("player.play failed:", err));
   }
-
-  startRecoverLoop();
 }
 
-async function togglePause() {
+function togglePause() {
   if (gamePhase !== "playing") return;
-  const now = performance.now();
-  if (now - lastTogglePauseAt < 300) return;
-  lastTogglePauseAt = now;
 
-  const wantResume = isPaused ||
-    (mode === "midi" && midy.isPaused) ||
-    (mode === "audio" && !_audioLeadIn && player.paused) ||
-    (mode === "audio" && _audioLeadIn && isPaused);
-
-  if (wantResume) {
-    await resumeFromPause();
+  // UI の isPaused を最優先（背面復帰後の midy とのずれを吸収）
+  if (isPaused) {
+    resumeFromPause();
     return;
   }
 
-  stopRecoverLoop();
   if (mode === "midi") {
     try {
       userInitiatedMidiPause = true;
@@ -1822,8 +1745,9 @@ async function togglePause() {
     player.pause();
   }
 }
-btnPause.addEventListener("click", () => {
-  togglePause().catch((err) => console.error("togglePause failed:", err));
+btnPause.addEventListener("click", (e) => {
+  e.stopPropagation();
+  togglePause();
 });
 
 // ---------------------------------------------------------------------------
@@ -2377,21 +2301,21 @@ midy.addEventListener("paused", () => {
 
 midy.addEventListener("resumed", () => {
   if (mode !== "midi") return;
+  // 再生開始時は必ず非一時停止 UI に揃える
   isPaused = false;
   pauseOverlay.classList.add("hidden");
   if (btnPause) {
     btnPause.classList.remove("hidden");
     btnPause.innerHTML = ICON_PAUSE;
   }
+  // resume なので scoreDisplay の文字はリセットしない（現在のスコアを保持したまま出す）
   scoreDisplay?.classList.remove("hidden");
   if (gamePhase === "playing") {
-    // 壁時計進行中ならその位置から midy 実測へ滑らかに乗せる
-    _resumeBaseGameTime = currentGameTime();
+    _resumeBaseGameTime = _pausedAt;
     _resumeBasePerf = performance.now();
     _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
     _resumeStabilizeMaxUntil = _resumeBasePerf + RESUME_STABILIZE_MAX_MS;
     startRaf();
-    stopRecoverLoop();
     return;
   }
   startGameMidi();
@@ -2991,7 +2915,7 @@ document.addEventListener("visibilitychange", () => {
     pauseForBackground();
     return;
   }
-  ensureAudioRunning().catch(() => {});
+  kickAudioContextSync();
   if (gamePhase === "playing" && !isPaused) {
     gameLogicTick();
   }
@@ -3000,9 +2924,9 @@ globalThis.addEventListener("pagehide", () => {
   pauseForBackground();
 });
 globalThis.addEventListener("pageshow", () => {
-  ensureAudioRunning().catch(() => {});
+  kickAudioContextSync();
 });
-// 解除後は再ポーズせず、AudioContext の回復だけ試す
+// 解除後は UI を再ポーズせず、AudioContext の復帰だけ試す
 audioContext.addEventListener("statechange", () => {
   if (performance.now() < resumeGuardUntil) return;
   if (isPaused || gamePhase !== "playing") return;
@@ -3010,8 +2934,7 @@ audioContext.addEventListener("statechange", () => {
     audioContext.state === "suspended" ||
     audioContext.state === "interrupted"
   ) {
-    ensureAudioRunning().catch(() => {});
-    startRecoverLoop();
+    kickAudioContextSync();
   }
 });
 
