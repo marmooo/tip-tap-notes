@@ -383,8 +383,7 @@ function currentGameTime() {
     if (now < _resumeStabilizeMinUntil) {
       return approx;
     }
-    // UI は再生中なのに midy がまだ pause のときだけ壁時計を継続（音復帰待ち）。
-    // 通常再生・startDelay 中は midy.isPaused=false なので従来通り real を使う。
+    // UI 再生中だが midy がまだ pause のときだけ壁時計（startDelay 中は isPaused=false かつ midy 再生中）
     if (midy.isPaused && _resumeBasePerf > 0) {
       return approx;
     }
@@ -566,6 +565,8 @@ function onWorkerMessage(e) {
       // maxDuration 有限（実尺 > SHORT の SHORT）:
       //   120s 強制終了用のフェードへ。ノート消化が先に来た場合も同様。
       if (gamePhase !== "playing") break;
+      // ユーザー一時停止中の tick / midy.pause 由来の誤 ended でスコア画面に行かない
+      if (isPaused || userInitiatedMidiPause) break;
       if (maxDuration === Infinity) {
         stopRaf();
         showResult();
@@ -660,7 +661,7 @@ function applyNotes(forceResend = false) {
 // メインスレッドから Worker へ現在時刻を送り、SHORT終了判定も行う。
 // rAF（描画用）と setInterval（バックグラウンド耐性）の両方から呼ばれる。
 function gameLogicTick() {
-  if (gamePhase !== "playing" || isPaused) return;
+  if (gamePhase !== "playing" || isPaused || userInitiatedMidiPause) return;
   const t = currentGameTime();
   try {
     worker?.postMessage({ type: "tick", currentTime: t });
@@ -1486,9 +1487,10 @@ document.addEventListener("keydown", (e) => {
   ) return;
   if (e.code === "Space") {
     if (gamePhase === "playing") {
-      e.preventDefault();
+      e.preventDefault(); // ページスクロールを防ぐ
       togglePause();
     } else if (gamePhase === "ready" || gamePhase === "result") {
+      // btnBigStart / btnBigReplay と同じ操作をキーボードからも行えるようにする
       e.preventDefault();
       startOrReplay();
     }
@@ -1595,12 +1597,10 @@ function scheduleAudioLeadInEnd(remainingSec) {
 }
 
 // ---------------------------------------------------------------------------
-// iOS 背面復帰
-//
-// 音を戻すには、クリック/タップの「同期スタック」内で audioContext.resume() を
-// 呼ぶ必要がある。await の後だとユーザージェスチャ扱いでなくなり無音のままになる。
-// ポーズボタンが死ぬのは、async のハングや midy.pause 往復の競合が原因になりやすい。
-// → 解除は同期で UI/rAF を戻し、音は同期 kick + 短いフォローアップのみ。
+// iOS 背面 + ポーズ安全化
+// 曲切り替え後などに midy の状態がずれていると、pause 時の tick/stopped が
+// 「曲終了」扱いになりスコア画面へ飛ぶ。ユーザーポーズでは isPaused を先に立て、
+// ended/stopped を無視する。
 // ---------------------------------------------------------------------------
 
 let resumeGuardUntil = 0;
@@ -1656,11 +1656,10 @@ function pauseForBackground() {
 }
 
 function resumeFromPause() {
-  // 遅延 paused で再ポーズしない
   resumeGuardUntil = performance.now() + 2000;
   userInitiatedMidiPause = false;
 
-  // ★ 同期: ユーザージェスチャ内で AudioContext を起こす（音復帰の本命）
+  // 同期で AudioContext を起こす（iOS はジェスチャ内 resume が必須）
   kickAudioContextSync();
 
   _resumeBaseGameTime = _pausedAt;
@@ -1668,19 +1667,16 @@ function resumeFromPause() {
   _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
   _resumeStabilizeMaxUntil = _resumeBasePerf + RESUME_STABILIZE_MAX_MS;
 
-  // ★ 同期: UI とゲーム進行をすぐ戻す（ボタンが死なない）
   updatePauseUi(false);
   startRaf();
 
   if (mode === "midi") {
     try {
-      // midy が pause 中なら resume。pause→resume の往復はしない（競合の元）
       if (midy.isPaused) {
         const result = midy.resume();
         if (result && typeof result.then === "function") {
           result.then(
             () => {
-              // 実測時刻へ乗り換える準備
               _resumeBaseGameTime = currentGameTime();
               _resumeBasePerf = performance.now();
               _resumeStabilizeMinUntil = _resumeBasePerf +
@@ -1695,7 +1691,6 @@ function resumeFromPause() {
     } catch (err) {
       console.error("midy.resume failed:", err);
     }
-    // ジェスチャが切れる前にもう一度 kick（iOS で効くことがある）
     kickAudioContextSync();
     return;
   }
@@ -1714,35 +1709,43 @@ function resumeFromPause() {
 function togglePause() {
   if (gamePhase !== "playing") return;
 
-  // UI の isPaused を最優先（背面復帰後の midy とのずれを吸収）
+  // UI の isPaused を正とする（midy.isPaused だけ見ると再開扱いになる事故を防ぐ）
   if (isPaused) {
     resumeFromPause();
     return;
   }
 
+  // ---- ユーザーポーズ: 先に isPaused を立ててから音源を止める ----
+  // midy.pause や worker tick が ended/stopped を発火してもスコア画面に行かない。
+  try {
+    _pausedAt = currentGameTime();
+  } catch {
+    _pausedAt = 0;
+  }
+  stopRaf();
+  updatePauseUi(true);
+
   if (mode === "midi") {
     try {
       userInitiatedMidiPause = true;
-      midy.pause();
+      if (!midy.isPaused) {
+        midy.pause();
+      }
     } catch (err) {
       console.error("midy.pause failed:", err);
       userInitiatedMidiPause = false;
-      _pausedAt = currentGameTime();
-      stopRaf();
-      updatePauseUi(true);
     }
   } else if (mode === "audio") {
     if (_audioLeadIn) {
-      _pausedAt = currentGameTime();
       if (_audioLeadInTimeoutId !== null) {
         clearTimeout(_audioLeadInTimeoutId);
         _audioLeadInTimeoutId = null;
       }
-      stopRaf();
-      updatePauseUi(true);
       return;
     }
-    player.pause();
+    if (!player.paused) {
+      player.pause();
+    }
   }
 }
 btnPause.addEventListener("click", (e) => {
@@ -2283,12 +2286,24 @@ midy.addEventListener("paused", () => {
 
   if (performance.now() < resumeGuardUntil) return;
 
+  // ユーザー操作の一時停止。UI は togglePause 側で既に paused 済みのことが多い。
+  // ここでは tick の同期のみ（大きな時刻を送って ended にしないよう isPaused 中は worker ended を無視）。
   if (fromUser) {
     stopRaf();
-    _pausedAt = currentGameTime();
-    worker?.postMessage({ type: "tick", currentTime: _pausedAt });
     if (gamePhase === "playing") {
-      updatePauseUi(true);
+      if (!isPaused) {
+        try {
+          _pausedAt = currentGameTime();
+        } catch {
+          /* ignore */
+        }
+        updatePauseUi(true);
+      }
+      try {
+        worker?.postMessage({ type: "tick", currentTime: _pausedAt });
+      } catch (err) {
+        console.error("tick on pause failed:", err);
+      }
     }
     return;
   }
@@ -2324,11 +2339,11 @@ midy.addEventListener("resumed", () => {
 midy.addEventListener("stopped", () => {
   if (mode !== "midi") return;
   worker?.postMessage({ type: "stop" });
+  // ユーザー一時停止中の誤 stopped ではスコア画面に行かない
+  if (isPaused || userInitiatedMidiPause) return;
   // プレイ中の自然終了:
   // - すでにフェード中なら setTimeout / completeShortEnding に完了を任せる
-  //   （バックグラウンドで rAF が止まっていてもタイムアウトで showResult される）
   // - 未フェードなら音楽は既に止まっているのでスコア画面へ。
-  //   systemPauseMidi() で paused に揃えておき、リプレイは seekTo(0)+resume。
   if (gamePhase === "playing") {
     if (endingFadeStarted) {
       return;
@@ -2926,7 +2941,6 @@ globalThis.addEventListener("pagehide", () => {
 globalThis.addEventListener("pageshow", () => {
   kickAudioContextSync();
 });
-// 解除後は UI を再ポーズせず、AudioContext の復帰だけ試す
 audioContext.addEventListener("statechange", () => {
   if (performance.now() < resumeGuardUntil) return;
   if (isPaused || gamePhase !== "playing") return;
