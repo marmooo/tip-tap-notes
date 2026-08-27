@@ -379,7 +379,17 @@ function currentGameTime() {
   if (mode === "midi") {
     const now = performance.now();
     const approx = _resumeBaseGameTime + (now - _resumeBasePerf) / 1000;
+    if (isPaused) return _pausedAt;
     if (now < _resumeStabilizeMinUntil) {
+      return approx;
+    }
+    // 解除後に midy / AudioContext がまだ止まっている間だけ壁時計を継続。
+    // 通常再生中は midy.isPaused=false かつ context=running なので startDelay は従来通り。
+    const engineFrozen = midy.isPaused ||
+      (typeof audioContext !== "undefined" &&
+        audioContext &&
+        audioContext.state !== "running");
+    if (engineFrozen && _resumeBasePerf > 0) {
       return approx;
     }
     const real = midy.currentTime() - START_DELAY;
@@ -388,6 +398,10 @@ function currentGameTime() {
       Math.abs(real - approx) > RESUME_STABILIZE_TOLERANCE_SEC
     ) {
       return approx; // 実測値がまだ近似値と乖離＝startTime未確定とみなす
+    }
+    // 実測が壁時計より大きく遅れている＝時刻凍結。startDelay 中は real が進むのでここには来ない。
+    if (_resumeBasePerf > 0 && real + 0.08 < approx) {
+      return approx;
     }
     return real;
   }
@@ -829,6 +843,8 @@ function beginPlayback() {
   soundFontModal.hide();
   settingsModal.hide();
   userInitiatedMidiPause = false;
+  resumeGuardUntil = 0;
+  stopRecoverLoop();
   isPaused = false;
   showPlayHud();
   setWrapHeight(); // gamePhase="playing" になったので、ここでキャンバスを画面いっぱいに広げる
@@ -1112,14 +1128,7 @@ let configSnapshot = null;
 let settingsDirty = false;
 
 function readLaneKeysFromUI() {
-  // 入力欄は常に8個あるが、未入力スロットを filter(Boolean) で落とすと
-  // 配列が短くなり、最悪すべて空のときに [] が localStorage に保存されて
-  // キーコンフィグが壊れる。空欄は既存 config / 既定値で埋めて常に8要素を返す。
-  //
-  // 重要: input[type=text] は使わない。
-  // HTML ミニファイで type="text"（デフォルト属性）が削除されるとセレクタが
-  // 0件になり、UIのキー入力が一切読めず常にデフォルトのままになる。
-  // プレイ時は e.key.toLowerCase() と比較するため、保存値も小文字に揃える。
+  // HTML ミニファイで type="text" が落ちるため input[type=text] は使わない。
   const inputs = [
     ...document.querySelectorAll("#laneKeyInputs input"),
   ];
@@ -1410,7 +1419,6 @@ document.getElementById("laneKeyInputs").addEventListener("keydown", (e) => {
   const inp = e.target;
   if (!(inp instanceof HTMLInputElement) || e.key.length !== 1) return;
   e.preventDefault();
-  // 小文字で保持（プレイ時の判定が toLowerCase と比較するため）
   inp.value = e.key.toLowerCase();
   const inputs = [
     ...document.querySelectorAll("#laneKeyInputs input"),
@@ -1490,10 +1498,9 @@ document.addEventListener("keydown", (e) => {
   ) return;
   if (e.code === "Space") {
     if (gamePhase === "playing") {
-      e.preventDefault(); // ページスクロールを防ぐ
-      togglePause();
+      e.preventDefault();
+      togglePause().catch((err) => console.error("togglePause failed:", err));
     } else if (gamePhase === "ready" || gamePhase === "result") {
-      // btnBigStart / btnBigReplay と同じ操作をキーボードからも行えるようにする
       e.preventDefault();
       startOrReplay();
     }
@@ -1599,52 +1606,225 @@ function scheduleAudioLeadInEnd(remainingSec) {
   }, ms);
 }
 
-function togglePause() {
-  if (gamePhase !== "playing") return;
-  if (mode === "midi") {
-    try {
-      if (midy.isPaused) {
-        const result = midy.resume();
-        if (result && typeof result.catch === "function") {
-          result.catch((err) => console.error("midy.resume failed:", err));
-        }
-      } else {
-        userInitiatedMidiPause = true;
-        midy.pause();
-      }
-    } catch (err) {
-      console.error("midy.pause/resume failed:", err);
-      userInitiatedMidiPause = false;
-    }
-  } else if (mode === "audio") {
-    // リードイン中は <audio> がまだ動いていないので、壁時計ベースで一時停止/再開する。
-    if (_audioLeadIn) {
-      if (isPaused) {
-        // 再開: 停止時点のゲーム時刻から残りリードインを再開
-        _audioLeadInStartPerf = performance.now() -
-          (_pausedAt + START_DELAY) * 1000;
-        updatePauseUi(false);
-        startRaf();
-        scheduleAudioLeadInEnd(Math.max(0, -_pausedAt));
-      } else {
-        _pausedAt = currentGameTime();
-        if (_audioLeadInTimeoutId !== null) {
-          clearTimeout(_audioLeadInTimeoutId);
-          _audioLeadInTimeoutId = null;
-        }
-        stopRaf();
-        updatePauseUi(true);
-      }
+// ---------------------------------------------------------------------------
+// iOS 背面復帰
+// await resume が本筋。ただし Promise がハングし得るので timeout 付き。
+// 「少し動いて止まる」= 解除後に凍結した midy.currentTime へ切り替わるため、
+// エンジン復帰まで currentGameTime は壁時計を使い続ける（上記）。
+// ---------------------------------------------------------------------------
+
+let resumeGuardUntil = 0;
+let lastTogglePauseAt = 0;
+let recoverTimerId = null;
+
+function withTimeout(promise, ms, label) {
+  if (!promise || typeof promise.then !== "function") {
+    return Promise.resolve(promise);
+  }
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label || "async"} timed out after ${ms}ms`)),
+      ms,
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+async function ensureAudioRunning() {
+  if (!audioContext || audioContext.state === "running") return true;
+  try {
+    await withTimeout(audioContext.resume(), 800, "audioContext.resume");
+  } catch (err) {
+    console.error(err);
+  }
+  return audioContext.state === "running";
+}
+
+function stopRecoverLoop() {
+  if (recoverTimerId !== null) {
+    clearInterval(recoverTimerId);
+    recoverTimerId = null;
+  }
+}
+
+/** 解除後、エンジンが本当に動き出すまで resume を再試行 */
+function startRecoverLoop() {
+  stopRecoverLoop();
+  let n = 0;
+  recoverTimerId = setInterval(() => {
+    n++;
+    if (isPaused || gamePhase !== "playing" || n > 30) {
+      stopRecoverLoop();
       return;
     }
-    if (player.paused) {
-      player.play().catch((err) => console.error("player.play failed:", err));
-    } else {
-      player.pause();
+    ensureAudioRunning().catch(() => {});
+    if (mode === "midi") {
+      try {
+        if (midy.isPaused) {
+          const r = midy.resume();
+          if (r && typeof r.catch === "function") r.catch(() => {});
+        } else if (audioContext.state === "running") {
+          stopRecoverLoop();
+        }
+      } catch {
+        /* ignore */
+      }
+    } else if (mode === "audio" && !_audioLeadIn) {
+      if (player.paused) {
+        player.play().catch(() => {});
+      } else {
+        stopRecoverLoop();
+      }
+    }
+  }, 200);
+}
+
+function pauseForBackground() {
+  if (gamePhase !== "playing" || isPaused) return;
+  if (performance.now() < resumeGuardUntil) return;
+
+  stopRecoverLoop();
+  try {
+    _pausedAt = currentGameTime();
+  } catch {
+    /* ignore */
+  }
+  stopRaf();
+  updatePauseUi(true);
+
+  if (mode === "midi") {
+    if (!midy.isPaused) {
+      try {
+        userInitiatedMidiPause = true;
+        midy.pause();
+      } catch (err) {
+        console.error("midy.pause on background failed:", err);
+        userInitiatedMidiPause = false;
+      }
+    }
+  } else if (mode === "audio") {
+    if (_audioLeadIn) {
+      if (_audioLeadInTimeoutId !== null) {
+        clearTimeout(_audioLeadInTimeoutId);
+        _audioLeadInTimeoutId = null;
+      }
+    } else if (!player.paused) {
+      try {
+        player.pause();
+      } catch (err) {
+        console.error("player.pause on background failed:", err);
+      }
     }
   }
 }
-btnPause.addEventListener("click", togglePause);
+
+async function resumeFromPause() {
+  resumeGuardUntil = performance.now() + 4000;
+  userInitiatedMidiPause = false;
+
+  // 壁時計基準を先にセットしてから UI を戻す（動いて止まるを防ぐ）
+  _resumeBaseGameTime = _pausedAt;
+  _resumeBasePerf = performance.now();
+  _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
+  _resumeStabilizeMaxUntil = _resumeBasePerf + 4000;
+
+  updatePauseUi(false);
+  startRaf();
+
+  await ensureAudioRunning();
+
+  if (mode === "midi") {
+    try {
+      if (!midy.isPaused && isPaused === false) {
+        // 不整合: midy が playing 扱いでも時刻が止まっていることがある → 一旦 pause
+        // （isPaused は既に false）
+      }
+      if (!midy.isPaused) {
+        try {
+          userInitiatedMidiPause = true;
+          await withTimeout(Promise.resolve(midy.pause()), 400, "midy.pause");
+        } catch (err) {
+          console.error(err);
+        }
+        userInitiatedMidiPause = false;
+      }
+      if (midy.isPaused) {
+        await withTimeout(Promise.resolve(midy.resume()), 1500, "midy.resume");
+      }
+    } catch (err) {
+      console.error("midi resume failed:", err);
+    }
+  } else if (mode === "audio") {
+    if (_audioLeadIn) {
+      _audioLeadInStartPerf = performance.now() -
+        (_pausedAt + START_DELAY) * 1000;
+      scheduleAudioLeadInEnd(Math.max(0, -_pausedAt));
+    } else {
+      try {
+        await withTimeout(player.play(), 1500, "player.play");
+      } catch (err) {
+        console.error("player.play failed:", err);
+      }
+    }
+  }
+
+  startRecoverLoop();
+}
+
+async function togglePause() {
+  if (gamePhase !== "playing") return;
+  const now = performance.now();
+  if (now - lastTogglePauseAt < 300) return;
+  lastTogglePauseAt = now;
+
+  const wantResume = isPaused ||
+    (mode === "midi" && midy.isPaused) ||
+    (mode === "audio" && !_audioLeadIn && player.paused) ||
+    (mode === "audio" && _audioLeadIn && isPaused);
+
+  if (wantResume) {
+    await resumeFromPause();
+    return;
+  }
+
+  stopRecoverLoop();
+  if (mode === "midi") {
+    try {
+      userInitiatedMidiPause = true;
+      midy.pause();
+    } catch (err) {
+      console.error("midy.pause failed:", err);
+      userInitiatedMidiPause = false;
+      _pausedAt = currentGameTime();
+      stopRaf();
+      updatePauseUi(true);
+    }
+  } else if (mode === "audio") {
+    if (_audioLeadIn) {
+      _pausedAt = currentGameTime();
+      if (_audioLeadInTimeoutId !== null) {
+        clearTimeout(_audioLeadInTimeoutId);
+        _audioLeadInTimeoutId = null;
+      }
+      stopRaf();
+      updatePauseUi(true);
+      return;
+    }
+    player.pause();
+  }
+}
+btnPause.addEventListener("click", () => {
+  togglePause().catch((err) => console.error("togglePause failed:", err));
+});
 
 // ---------------------------------------------------------------------------
 // モード切り替え
@@ -2177,9 +2357,8 @@ midy.addEventListener("paused", () => {
   const fromUser = userInitiatedMidiPause;
   userInitiatedMidiPause = false;
 
-  // ユーザー操作の一時停止だけ stopRaf + 一時停止 UI。
-  // システム pause（SHORT終了など）がリプレイ後に遅延到着しても、
-  // 新プレイの rAF を止めたり isPaused を立てたりしない。
+  if (performance.now() < resumeGuardUntil) return;
+
   if (fromUser) {
     stopRaf();
     _pausedAt = currentGameTime();
@@ -2190,7 +2369,6 @@ midy.addEventListener("paused", () => {
     return;
   }
 
-  // システム pause: result 中なら先頭へ（completeShortEnding の then と二重でも安全）
   if (gamePhase === "result") {
     midy.seekTo(0);
     midy.setMasterVolume(1, audioContext.currentTime);
@@ -2199,21 +2377,21 @@ midy.addEventListener("paused", () => {
 
 midy.addEventListener("resumed", () => {
   if (mode !== "midi") return;
-  // 再生開始時は必ず非一時停止 UI に揃える
   isPaused = false;
   pauseOverlay.classList.add("hidden");
   if (btnPause) {
     btnPause.classList.remove("hidden");
     btnPause.innerHTML = ICON_PAUSE;
   }
-  // resume なので scoreDisplay の文字はリセットしない（現在のスコアを保持したまま出す）
   scoreDisplay?.classList.remove("hidden");
   if (gamePhase === "playing") {
-    _resumeBaseGameTime = _pausedAt;
+    // 壁時計進行中ならその位置から midy 実測へ滑らかに乗せる
+    _resumeBaseGameTime = currentGameTime();
     _resumeBasePerf = performance.now();
     _resumeStabilizeMinUntil = _resumeBasePerf + RESUME_STABILIZE_MIN_MS;
     _resumeStabilizeMaxUntil = _resumeBasePerf + RESUME_STABILIZE_MAX_MS;
     startRaf();
+    stopRecoverLoop();
     return;
   }
   startGameMidi();
@@ -2495,6 +2673,7 @@ player.addEventListener("pause", () => {
     suppressPauseHandling = false;
     return;
   }
+  if (performance.now() < resumeGuardUntil) return;
   if (gamePhase === "playing") {
     stopRaf();
     updatePauseUi(true);
@@ -2805,20 +2984,34 @@ async function restoreBackground() {
 }
 
 // ---------------------------------------------------------------------------
-// タブの表示/非表示
-// バックグラウンドでは AudioContext が suspend されやすく、復帰時に resume しないと
-// MIDI の currentTime が進まない。また、表示に戻った瞬間に logic tick を1回走らせて
-// 終了判定を取りこぼさないようにする。
+// タブ / ブラウザ背面・前面
 // ---------------------------------------------------------------------------
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) return;
-  if (audioContext.state === "suspended") {
-    audioContext.resume().catch((err) =>
-      console.error("audioContext.resume on visibility failed:", err)
-    );
+  if (document.hidden) {
+    pauseForBackground();
+    return;
   }
+  ensureAudioRunning().catch(() => {});
   if (gamePhase === "playing" && !isPaused) {
     gameLogicTick();
+  }
+});
+globalThis.addEventListener("pagehide", () => {
+  pauseForBackground();
+});
+globalThis.addEventListener("pageshow", () => {
+  ensureAudioRunning().catch(() => {});
+});
+// 解除後は再ポーズせず、AudioContext の回復だけ試す
+audioContext.addEventListener("statechange", () => {
+  if (performance.now() < resumeGuardUntil) return;
+  if (isPaused || gamePhase !== "playing") return;
+  if (
+    audioContext.state === "suspended" ||
+    audioContext.state === "interrupted"
+  ) {
+    ensureAudioRunning().catch(() => {});
+    startRecoverLoop();
   }
 });
 
