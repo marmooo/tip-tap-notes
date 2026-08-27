@@ -126,7 +126,7 @@ function loadConfig() {
         const k = loaded.laneKeys[i];
         keys.push(
           (typeof k === "string" && k.trim())
-            ? k.trim()
+            ? k.trim().toLowerCase()
             : DEFAULT_CONFIG.laneKeys[i],
         );
       }
@@ -1115,15 +1115,20 @@ function readLaneKeysFromUI() {
   // 入力欄は常に8個あるが、未入力スロットを filter(Boolean) で落とすと
   // 配列が短くなり、最悪すべて空のときに [] が localStorage に保存されて
   // キーコンフィグが壊れる。空欄は既存 config / 既定値で埋めて常に8要素を返す。
+  //
+  // 重要: input[type=text] は使わない。
+  // HTML ミニファイで type="text"（デフォルト属性）が削除されるとセレクタが
+  // 0件になり、UIのキー入力が一切読めず常にデフォルトのままになる。
+  // プレイ時は e.key.toLowerCase() と比較するため、保存値も小文字に揃える。
   const inputs = [
-    ...document.querySelectorAll("#laneKeyInputs input[type=text]"),
+    ...document.querySelectorAll("#laneKeyInputs input"),
   ];
   const keys = [];
   for (let i = 0; i < DEFAULT_CONFIG.laneKeys.length; i++) {
-    const typed = inputs[i]?.value.trim() ?? "";
+    const typed = (inputs[i]?.value ?? "").trim().toLowerCase();
     keys.push(
       typed ||
-        config.laneKeys[i] ||
+        String(config.laneKeys[i] || "").toLowerCase() ||
         DEFAULT_CONFIG.laneKeys[i] ||
         String(i + 1),
     );
@@ -1403,9 +1408,10 @@ document.getElementById("btnSettings").addEventListener("click", openSettings);
 // レーンキー入力は静的な8個をまとめて委譲で処理（1文字入力→次の欄へフォーカス移動）
 document.getElementById("laneKeyInputs").addEventListener("keydown", (e) => {
   const inp = e.target;
-  if (inp.tagName !== "INPUT" || e.key.length !== 1) return;
+  if (!(inp instanceof HTMLInputElement) || e.key.length !== 1) return;
   e.preventDefault();
-  inp.value = e.key;
+  // 小文字で保持（プレイ時の判定が toLowerCase と比較するため）
+  inp.value = e.key.toLowerCase();
   const inputs = [
     ...document.querySelectorAll("#laneKeyInputs input"),
   ];
@@ -1497,7 +1503,9 @@ document.addEventListener("keydown", (e) => {
   if (pressedKeys.has(key)) return;
   pressedKeys.add(key);
   if (gamePhase !== "playing" || isPaused) return;
-  const lane = config.laneKeys.indexOf(key);
+  const lane = config.laneKeys.findIndex(
+    (k) => String(k || "").toLowerCase() === key,
+  );
   if (lane >= 0) {
     worker?.postMessage({
       type: "pressLane",
@@ -1510,7 +1518,9 @@ document.addEventListener("keyup", (e) => {
   const key = e.key.toLowerCase();
   pressedKeys.delete(key);
   if (gamePhase !== "playing" || isPaused) return;
-  const lane = config.laneKeys.indexOf(key);
+  const lane = config.laneKeys.findIndex(
+    (k) => String(k || "").toLowerCase() === key,
+  );
   if (lane >= 0) worker?.postMessage({ type: "releaseLane", lane });
 }, { capture: true });
 
