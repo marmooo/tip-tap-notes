@@ -10,7 +10,7 @@
  * rhythm-game-worker.js での判定/描画）は完全に共通。
  */
 
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.4/dist/midy.min.js";
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.5/dist/midy.min.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
   DIFFICULTIES,
@@ -1820,10 +1820,10 @@ midy.startDelay = START_DELAY;
 
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";
 // 現在選択中のサウンドフォントのベースURL（ディレクトリ）。
-// 例: "https://soundfonts.pages.dev/GeneralUser_GS_v1.471"
+// 例: "https://soundfonts.pages.dev/GeneralUser_GS_v2.0.3"
 // サウンドフォントライブラリで選択が変わると soundFontURL だけ更新し、
 // 実際の読み込みは次回の startMidiPlayback() 時にまとめて行う。
-let soundFontURL = SOUNDFONT_BASE + "GeneralUser_GS_v1.471";
+let soundFontURL = SOUNDFONT_BASE + "GeneralUser_GS_v2.0.3";
 
 // 読み込み済みの楽器はスキップしつつ、今回のMIDIで実際に使われている楽器に
 // 対応する .sf3 のパス一覧を作る。
@@ -1835,8 +1835,7 @@ function getSoundFontPaths() {
     const programNumber = Number(program);
     const index = midy.soundFontTable[programNumber]?.[bankNumber];
     if (index !== undefined) continue;
-    const baseName = bankNumber === 128 ? "128" : program;
-    paths.push(`${soundFontURL}/${baseName}.sf3`);
+    paths.push(`${soundFontURL}/${bank}/${program}.sf3`);
   }
   return paths;
 }
