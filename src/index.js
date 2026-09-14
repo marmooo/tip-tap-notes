@@ -24,6 +24,9 @@ import { installIOSTouchGuards } from "/tip-tap-notes/ios-touch-guards.js";
 // 定数
 // ---------------------------------------------------------------------------
 
+const MIDI_DB = "https://midi-db.pages.dev";
+const SOUNDFONT_BASE = "https://soundfonts.pages.dev";
+
 // MIDI / 音声 共通の開始遅延。ノートが判定ラインに到達する前にスクロールインする
 // リードイン時間。midy.startDelay にも同じ値を渡す。
 const START_DELAY = 3; // 秒
@@ -1818,12 +1821,11 @@ midy.cacheMode = CACHE_MODES.includes(config.cacheMode)
   : "chunk";
 midy.startDelay = START_DELAY;
 
-const SOUNDFONT_BASE = "https://soundfonts.pages.dev/";
 // 現在選択中のサウンドフォントのベースURL（ディレクトリ）。
 // 例: "https://soundfonts.pages.dev/GeneralUser_GS_v2.0.3"
 // サウンドフォントライブラリで選択が変わると soundFontURL だけ更新し、
 // 実際の読み込みは次回の startMidiPlayback() 時にまとめて行う。
-let soundFontURL = SOUNDFONT_BASE + "GeneralUser_GS_v2.0.3";
+let soundFontURL = SOUNDFONT_BASE + "/GeneralUser_GS_v2.0.3";
 
 // 読み込み済みの楽器はスキップしつつ、今回のMIDIで実際に使われている楽器に
 // 対応する .sf3 のパス一覧を作る。
@@ -2020,6 +2022,7 @@ selectPanel.addEventListener("drop", (e) => {
 // ---------------------------------------------------------------------------
 
 const midiLibrary = new MidiLibrary({
+  midiDB: MIDI_DB,
   table: "libraryTable",
   pagination: "libraryPagination",
   columns: "libraryColumns",
@@ -2027,7 +2030,7 @@ const midiLibrary = new MidiLibrary({
   instruments: "libraryInstruments",
   lang: ["ja", "en"].includes(htmlLang) ? htmlLang : "en",
   onSelect: async (row) => {
-    const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
+    const buf = await (await fetch(`${MIDI_DB}/${row.file}`))
       .arrayBuffer();
     await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
     libraryModal.hide();
@@ -2191,7 +2194,7 @@ async function playRandomLongMidi() {
     btn.textContent = t("randomMidiLoading");
   }
   try {
-    const buf = await (await fetch(`https://midi-db.pages.dev/${row.file}`))
+    const buf = await (await fetch(`${MIDI_DB}/${row.file}`))
       .arrayBuffer();
     await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
   } catch (err) {
@@ -2225,7 +2228,7 @@ let soundFontListLoaded = false;
 async function loadSoundFontLibrary() {
   const el = document.getElementById("soundFontLibraryList");
   try {
-    const list = await (await fetch(`${SOUNDFONT_BASE}list.json`)).json();
+    const list = await (await fetch(`${SOUNDFONT_BASE}/list.json`)).json();
     el.innerHTML = "";
     list.forEach((sf, i) => {
       const id = `soundFontLibraryItem-${i}`;
@@ -2238,7 +2241,7 @@ async function loadSoundFontLibrary() {
         }>` +
         `<label class="form-check-label" for="${id}">${sf.name}</label>`;
       el.appendChild(wrap);
-      if (checked) soundFontURL = SOUNDFONT_BASE + sf.name;
+      if (checked) soundFontURL = SOUNDFONT_BASE + "/" + sf.name;
     });
     soundFontListLoaded = true;
   } catch (err) {
@@ -2251,7 +2254,7 @@ document.getElementById("soundFontLibraryList").addEventListener(
   "change",
   (e) => {
     if (e.target.name !== "soundFontLibrary") return;
-    soundFontURL = SOUNDFONT_BASE + e.target.value;
+    soundFontURL = SOUNDFONT_BASE + "/" + e.target.value;
   },
 );
 
