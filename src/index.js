@@ -2232,7 +2232,7 @@ async function loadSoundFontLibrary() {
     el.innerHTML = "";
     list.forEach((sf, i) => {
       const id = `soundFontLibraryItem-${i}`;
-      const checked = sf.name === "GeneralUser_GS_v1.471";
+      const checked = sf.name === "GeneralUser_GS_v2.0.3";
       const wrap = document.createElement("div");
       wrap.className = "form-check";
       wrap.innerHTML =
