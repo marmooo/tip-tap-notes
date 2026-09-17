@@ -328,16 +328,23 @@
         font-weight: 600;
         pointer-events: none;
       }
-      #selectFile {
+      /* Primary CTA on start screen: Random MIDI */
+      #btnRandomMidiStart {
         background: linear-gradient(135deg, #f76707, #d9480f);
         border: none; color: #fff;
         box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55);
+        font-weight: 700;
+        padding: 0.55rem 1.35rem;
       }
-      #selectFile:hover, #selectFile:focus {
+      #btnRandomMidiStart:hover, #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #fd7e14, #d9480f);
+        color: #fff;
+      }
+      #btnRandomMidiStart:disabled {
+        opacity: 0.75;
       }
       @media (prefers-reduced-motion: no-preference) {
-        #selectFile { animation: heroPulse 2.6s ease-in-out infinite; }
+        #btnRandomMidiStart { animation: heroPulse 2.6s ease-in-out infinite; }
       }
       @keyframes heroPulse {
         0%, 100% { box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55); }
@@ -361,14 +368,15 @@
         box-shadow: 0 12px 40px -16px rgba(0, 0, 0, 0.45),
                     0 0 0 1px color-mix(in srgb, var(--bs-warning) 8%, transparent) inset;
       }
-      html[data-bs-theme="dark"] #selectFile {
+      html[data-bs-theme="dark"] #btnRandomMidiStart {
         background: linear-gradient(135deg, #ffb703, #fb8500);
         box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65);
         animation-name: heroPulseDark;
       }
-      html[data-bs-theme="dark"] #selectFile:hover,
-      html[data-bs-theme="dark"] #selectFile:focus {
+      html[data-bs-theme="dark"] #btnRandomMidiStart:hover,
+      html[data-bs-theme="dark"] #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #ffc93c, #fb8500);
+        color: #fff;
       }
       @keyframes heroPulseDark {
         0%, 100% { box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65); }
@@ -638,16 +646,25 @@
                 <span class="feature-chip">💻 インストール不要</span>
               </div>
             </div>
-            <!-- File selector（MIDI / SoundFont / 音声ファイル、まとめて1つ） -->
+                        <!-- Primary: random MIDI. Secondary: file / library. -->
             <div id="selectPanel" class="card border-secondary-subtle border-dashed mt-3 mx-auto"
                  style="max-width: 34rem;">
-              <div class="card-body py-3 px-3 d-flex flex-wrap gap-2 align-items-center justify-content-center">
-                <button id="selectFile" class="btn btn-primary rounded-pill">ファイルを選択</button>
-                <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
-                <button id="openLibrary" class="btn btn-outline-info rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 MIDIライブラリから選ぶ</button>
-                <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 サウンドフォントライブラリから選ぶ</button>
+              <div class="card-body py-3 px-3 d-flex flex-column gap-2 align-items-center">
+                <button id="btnRandomMidiStart" type="button"
+                        class="btn btn-primary rounded-pill">
+                  🎲 ランダム MIDI
+                </button>
+                <p class="small text-muted mb-0 text-center">
+                  1分以上の曲をランダムに選んですぐプレイ
+                </p>
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-center mt-1">
+                  <button id="selectFile" class="btn btn-outline-secondary rounded-pill btn-sm">ファイルを選択</button>
+                  <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
+                  <button id="openLibrary" class="btn btn-outline-info rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 MIDIライブラリ</button>
+                  <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 サウンドフォント</button>
+                </div>
               </div>
             </div>
 
@@ -1082,6 +1099,9 @@
     <div id="i18nStrings" hidden>
       <span data-key="randomMidi">🎲 ランダム MIDI</span>
       <span data-key="randomMidiLoading">⏳ 読込中…</span>
+      <span data-key="randomMidiStillLoading">MIDIライブラリを読み込み中です。少し待ってから再度お試しください。</span>
+      <span data-key="randomMidiNoCandidates">1分以上の曲がライブラリに見つかりませんでした。</span>
+      <span data-key="randomMidiLoadFailedPrefix">ランダム MIDI の読み込みに失敗しました: </span>
       <span data-key="unsupportedFileType">対応していないファイル形式です（MIDI / SoundFont / 音声ファイルに対応しています）</span>
       <span data-key="beatmapGenerationFailedPrefix">譜面生成に失敗しました: </span>
       <span data-key="audioNotLoaded">音声が読み込まれていません</span>

@@ -317,16 +317,23 @@
         font-weight: 600;
         pointer-events: none;
       }
-      #selectFile {
+      /* Primary CTA on start screen: Random MIDI */
+      #btnRandomMidiStart {
         background: linear-gradient(135deg, #f76707, #d9480f);
         border: none; color: #fff;
         box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55);
+        font-weight: 700;
+        padding: 0.55rem 1.35rem;
       }
-      #selectFile:hover, #selectFile:focus {
+      #btnRandomMidiStart:hover, #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #fd7e14, #d9480f);
+        color: #fff;
+      }
+      #btnRandomMidiStart:disabled {
+        opacity: 0.75;
       }
       @media (prefers-reduced-motion: no-preference) {
-        #selectFile { animation: heroPulse 2.6s ease-in-out infinite; }
+        #btnRandomMidiStart { animation: heroPulse 2.6s ease-in-out infinite; }
       }
       @keyframes heroPulse {
         0%, 100% { box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55); }
@@ -350,14 +357,15 @@
         box-shadow: 0 12px 40px -16px rgba(0, 0, 0, 0.45),
                     0 0 0 1px color-mix(in srgb, var(--bs-warning) 8%, transparent) inset;
       }
-      html[data-bs-theme="dark"] #selectFile {
+      html[data-bs-theme="dark"] #btnRandomMidiStart {
         background: linear-gradient(135deg, #ffb703, #fb8500);
         box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65);
         animation-name: heroPulseDark;
       }
-      html[data-bs-theme="dark"] #selectFile:hover,
-      html[data-bs-theme="dark"] #selectFile:focus {
+      html[data-bs-theme="dark"] #btnRandomMidiStart:hover,
+      html[data-bs-theme="dark"] #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #ffc93c, #fb8500);
+        color: #fff;
       }
       @keyframes heroPulseDark {
         0%, 100% { box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65); }
@@ -615,16 +623,25 @@
                 <span class="feature-chip">💻 No install needed</span>
               </div>
             </div>
-            <!-- File selector (MIDI / SoundFont / audio files, single entry) -->
+                        <!-- Primary: random MIDI for instant play. Secondary: file / library pickers. -->
             <div id="selectPanel" class="card border-secondary-subtle border-dashed mt-3 mx-auto"
                  style="max-width: 34rem;">
-              <div class="card-body py-3 px-3 d-flex flex-wrap gap-2 align-items-center justify-content-center">
-                <button id="selectFile" class="btn btn-primary rounded-pill">Select file</button>
-                <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
-                <button id="openLibrary" class="btn btn-outline-info rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 Choose from MIDI library</button>
-                <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 Choose from SoundFont library</button>
+              <div class="card-body py-3 px-3 d-flex flex-column gap-2 align-items-center">
+                <button id="btnRandomMidiStart" type="button"
+                        class="btn btn-primary rounded-pill">
+                  🎲 Random MIDI
+                </button>
+                <p class="small text-muted mb-0 text-center">
+                  Pick a random song over 1 minute and jump in
+                </p>
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-center mt-1">
+                  <button id="selectFile" class="btn btn-outline-secondary rounded-pill btn-sm">Select file</button>
+                  <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
+                  <button id="openLibrary" class="btn btn-outline-info rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 MIDI library</button>
+                  <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 SoundFont</button>
+                </div>
               </div>
             </div>
 
@@ -1057,6 +1074,11 @@
     <!-- i18n strings for game.js (alerts/error messages, analysis progress labels, etc.
          Dynamic text not held as HTML elements. For localization, swap only this block.) -->
     <div id="i18nStrings" hidden>
+      <span data-key="randomMidi">🎲 Random MIDI</span>
+      <span data-key="randomMidiLoading">⏳ Loading…</span>
+      <span data-key="randomMidiStillLoading">MIDI library is still loading. Please try again in a moment.</span>
+      <span data-key="randomMidiNoCandidates">No songs longer than 1 minute were found in the library.</span>
+      <span data-key="randomMidiLoadFailedPrefix">Failed to load random MIDI: </span>
       <span data-key="unsupportedFileType">Unsupported file type (supports MIDI / SoundFont / audio files)</span>
       <span data-key="beatmapGenerationFailedPrefix">Chart generation failed: </span>
       <span data-key="audioNotLoaded">Audio is not loaded</span>

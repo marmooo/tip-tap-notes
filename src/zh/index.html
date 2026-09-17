@@ -321,16 +321,23 @@
         font-weight: 600;
         pointer-events: none;
       }
-      #selectFile {
+      /* Primary CTA on start screen: Random MIDI */
+      #btnRandomMidiStart {
         background: linear-gradient(135deg, #f76707, #d9480f);
         border: none; color: #fff;
         box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55);
+        font-weight: 700;
+        padding: 0.55rem 1.35rem;
       }
-      #selectFile:hover, #selectFile:focus {
+      #btnRandomMidiStart:hover, #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #fd7e14, #d9480f);
+        color: #fff;
+      }
+      #btnRandomMidiStart:disabled {
+        opacity: 0.75;
       }
       @media (prefers-reduced-motion: no-preference) {
-        #selectFile { animation: heroPulse 2.6s ease-in-out infinite; }
+        #btnRandomMidiStart { animation: heroPulse 2.6s ease-in-out infinite; }
       }
       @keyframes heroPulse {
         0%, 100% { box-shadow: 0 4px 14px -4px rgba(120, 53, 15, 0.55); }
@@ -354,14 +361,15 @@
         box-shadow: 0 12px 40px -16px rgba(0, 0, 0, 0.45),
                     0 0 0 1px color-mix(in srgb, var(--bs-warning) 8%, transparent) inset;
       }
-      html[data-bs-theme="dark"] #selectFile {
+      html[data-bs-theme="dark"] #btnRandomMidiStart {
         background: linear-gradient(135deg, #ffb703, #fb8500);
         box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65);
         animation-name: heroPulseDark;
       }
-      html[data-bs-theme="dark"] #selectFile:hover,
-      html[data-bs-theme="dark"] #selectFile:focus {
+      html[data-bs-theme="dark"] #btnRandomMidiStart:hover,
+      html[data-bs-theme="dark"] #btnRandomMidiStart:focus {
         background: linear-gradient(135deg, #ffc93c, #fb8500);
+        color: #fff;
       }
       @keyframes heroPulseDark {
         0%, 100% { box-shadow: 0 4px 18px -4px rgba(251, 133, 0, 0.65); }
@@ -623,16 +631,25 @@
                 <span class="feature-chip">💻 无需安装</span>
               </div>
             </div>
-            <!-- 文件选择器（MIDI / SoundFont / 音频文件，统一入口） -->
+                        <!-- Primary: random MIDI. Secondary: file / library. -->
             <div id="selectPanel" class="card border-secondary-subtle border-dashed mt-3 mx-auto"
                  style="max-width: 34rem;">
-              <div class="card-body py-3 px-3 d-flex flex-wrap gap-2 align-items-center justify-content-center">
-                <button id="selectFile" class="btn btn-primary rounded-pill">选择文件</button>
-                <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
-                <button id="openLibrary" class="btn btn-outline-info rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 从 MIDI 库中选择</button>
-                <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill"
-                        data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 从 SoundFont 库中选择</button>
+              <div class="card-body py-3 px-3 d-flex flex-column gap-2 align-items-center">
+                <button id="btnRandomMidiStart" type="button"
+                        class="btn btn-primary rounded-pill">
+                  🎲 随机 MIDI
+                </button>
+                <p class="small text-muted mb-0 text-center">
+                  随机选择超过 1 分钟的曲目并立即开始
+                </p>
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-center mt-1">
+                  <button id="selectFile" class="btn btn-outline-secondary rounded-pill btn-sm">选择文件</button>
+                  <input id="inputFile" type="file" accept=".mid,.midi,.sf2,.sf3,audio/*" hidden>
+                  <button id="openLibrary" class="btn btn-outline-info rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#screenLibrary">🎼 MIDI 库</button>
+                  <button id="openSoundFontLibrary" class="btn btn-outline-success rounded-pill btn-sm"
+                          data-bs-toggle="modal" data-bs-target="#soundFontLibraryModal">🎺 SoundFont</button>
+                </div>
               </div>
             </div>
 
@@ -1067,6 +1084,9 @@
     <div id="i18nStrings" hidden>
       <span data-key="randomMidi">🎲 随机 MIDI</span>
       <span data-key="randomMidiLoading">⏳ 加载中…</span>
+      <span data-key="randomMidiStillLoading">MIDI 库仍在加载中，请稍后再试。</span>
+      <span data-key="randomMidiNoCandidates">库中未找到超过 1 分钟的曲目。</span>
+      <span data-key="randomMidiLoadFailedPrefix">随机 MIDI 加载失败：</span>
       <span data-key="unsupportedFileType">不支持的文件类型（支持 MIDI / SoundFont / 音频文件）</span>
       <span data-key="beatmapGenerationFailedPrefix">谱面生成失败：</span>
       <span data-key="audioNotLoaded">音频尚未加载</span>

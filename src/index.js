@@ -2171,9 +2171,22 @@ function parseMidiLibraryTime(timeStr) {
 const RANDOM_MIDI_MIN_SECONDS = 60;
 let randomMidiBusy = false;
 
+function randomMidiButtons() {
+  return [
+    document.getElementById("btnRandomMidi"),
+    document.getElementById("btnRandomMidiStart"),
+  ].filter(Boolean);
+}
+
+function setRandomMidiButtonsBusy(busy) {
+  for (const btn of randomMidiButtons()) {
+    btn.disabled = busy;
+    btn.textContent = busy ? t("randomMidiLoading") : t("randomMidi");
+  }
+}
+
 async function playRandomLongMidi() {
   if (randomMidiBusy) return;
-  const btn = document.getElementById("btnRandomMidi");
   const data = midiLibrary.fullData;
   if (!data || data.length === 0) {
     alert(t("randomMidiStillLoading"));
@@ -2189,10 +2202,7 @@ async function playRandomLongMidi() {
   }
   const row = candidates[Math.floor(Math.random() * candidates.length)];
   randomMidiBusy = true;
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = t("randomMidiLoading");
-  }
+  setRandomMidiButtonsBusy(true);
   try {
     const buf = await (await fetch(`${MIDI_DB}/${row.file}`))
       .arrayBuffer();
@@ -2202,21 +2212,17 @@ async function playRandomLongMidi() {
     alert(t("randomMidiLoadFailedPrefix") + (err?.message || err));
   } finally {
     randomMidiBusy = false;
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = t("randomMidi");
-    }
+    setRandomMidiButtonsBusy(false);
   }
 }
 
-document.getElementById("btnRandomMidi")?.addEventListener(
-  "click",
-  () => {
+for (const id of ["btnRandomMidi", "btnRandomMidiStart"]) {
+  document.getElementById(id)?.addEventListener("click", () => {
     playRandomLongMidi().catch((err) =>
       console.error("playRandomLongMidi failed:", err)
     );
-  },
-);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // SoundFont library（Bootstrap modal 内の一覧から選択。ラジオボタンなので
