@@ -6,6 +6,7 @@ also play MIDI files directly and change the sound source using SoundFonts
 (SF2/SF3).
 
 [フリーゲーム夢現](https://freegame-mugen.jp/puzzle/game_15347.html)
+
 [itch.io](https://marmooo-games.itch.io/tip-tap-notes)
 
 ## Screenshots
@@ -24,9 +25,11 @@ Settings Screen ![Settings Screen](screenshots/mugen/05.png)
 
 Score Screen ![Score Screen](screenshots/mugen/06.png)
 
-Customization - Background ![Customization - Background](screenshots/mugen/07.png)
+Customization - Background
+![Customization - Background](screenshots/mugen/07.png)
 
-Customization - Notes/Lanes ![Customization - Notes/Lanes](screenshots/mugen/08.png)
+Customization - Notes/Lanes
+![Customization - Notes/Lanes](screenshots/mugen/08.png)
 
 Customization - Keys ![Customization - Keys](screenshots/mugen/09.png)
 
