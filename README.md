@@ -5,9 +5,8 @@ just by loading music files (MP3/WAV/OGG, etc.). Built around tap notes. You can
 also play MIDI files directly and change the sound source using SoundFonts
 (SF2/SF3).
 
-[フリーゲーム夢現](https://freegame-mugen.jp/puzzle/game_15347.html)
-
-[itch.io](https://marmooo-games.itch.io/tip-tap-notes)
+- [フリーゲーム夢現](https://freegame-mugen.jp/puzzle/game_15347.html)
+- [itch.io](https://marmooo-games.itch.io/tip-tap-notes)
 
 ## Screenshots
 
