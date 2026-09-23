@@ -1793,6 +1793,9 @@ function switchMode(next) {
   if (mode === next) return;
   stopAllPlayback();
   mode = next;
+  // 前のモード／曲向けのキャッシュ予熱が走っていたら無効化する
+  midiCacheWarmupToken++;
+  midiCacheWarmupPromise = null;
 
   // html[data-mode] は readyHintAudio（音声モードの案内）だけがCSS側で参照している。
   // start画面のタイトル/説明はモードに関わらず常に固定表示。
@@ -1840,6 +1843,36 @@ function getSoundFontPaths() {
     paths.push(`${soundFontURL}/${bank}/${program}.sf3`);
   }
   return paths;
+}
+
+// MIDI 選択直後～START ボタンを押すまでの間に、バックグラウンドで
+// SoundFont読み込み／ボイスID解決／サンプルデコードを終わらせておく。
+// これにより startMidiPlayback() 実行時（＝START押下時）の体感的な重さを
+// 下げる。warmupMidiCache() は選曲のたびに呼び直され、古い呼び出しの
+// 処理が完了しても意味がないよう世代トークンで無効化する。
+let midiCacheWarmupPromise = null;
+let midiCacheWarmupToken = 0;
+
+function warmupMidiCache() {
+  const token = ++midiCacheWarmupToken;
+  const promise = (async () => {
+    try {
+      // 1. 同期・通信なし（SoundFont が既に読み込み済みの楽器のみの場合）
+      await midy.loadSoundFont(getSoundFontPaths());
+      if (token !== midiCacheWarmupToken) return;
+      midy.cacheVoiceIds();
+      if (token !== midiCacheWarmupToken) return;
+      // 2. デコード。未取得サンプルがあると通信しうる
+      await midy.preloadSamples();
+      // await midy.prewarmSimpleNoteCache(); // 任意。CPU と OAC のみ
+    } catch (err) {
+      // ここで失敗しても致命的ではない（startMidiPlayback() 側で
+      // 通常どおり loadSoundFont からやり直す）ので握りつぶしてログのみ。
+      console.error("MIDI cache warmup failed:", err);
+    }
+  })();
+  midiCacheWarmupPromise = promise;
+  return promise;
 }
 
 // 別の曲を読み込む前（loadMIDIBytes / switchMode）に確実に停止させる。
@@ -1910,9 +1943,24 @@ async function startMidiPlayback() {
   } else {
     await ensureMidiStopped();
   }
-  await midy.loadSoundFont(getSoundFontPaths());
+  // warmupMidiCache() がバックグラウンドで loadSoundFont / cacheVoiceIds /
+  // preloadSamples まで済ませてくれていれば、ここでは完了を待つだけで済む。
+  // まだ warmup していない（または失敗した）場合は、従来どおりここで
+  // SoundFont読み込みからやり直す。
+  if (midiCacheWarmupPromise) {
+    try {
+      await midiCacheWarmupPromise;
+    } catch (err) {
+      console.error("midiCacheWarmupPromise failed:", err);
+    }
+  } else {
+    await midy.loadSoundFont(getSoundFontPaths());
+    midy.cacheVoiceIds();
+    await midy.preloadSamples();
+  }
   midy.setMasterVolume(1, audioContext.currentTime);
-  await midy.start();
+  // preload はここまでで完了済みなので、start() 側の内部 preload はスキップする
+  await midy.start({ preload: false });
   midiHasStartedOnce = true;
 }
 
@@ -1929,6 +1977,8 @@ async function loadMIDIBytes(bytes, meta = null) {
   applyNotes(true);
   updatePlayLengthLabels();
   showScreen("ready");
+  // START が押されるまでの間にバックグラウンドでキャッシュを温めておく
+  warmupMidiCache();
 }
 
 // ---------------------------------------------------------------------------
@@ -2261,6 +2311,8 @@ document.getElementById("soundFontLibraryList").addEventListener(
   (e) => {
     if (e.target.name !== "soundFontLibrary") return;
     soundFontURL = SOUNDFONT_BASE + "/" + e.target.value;
+    // SoundFont を切り替えたら、そのぶんキャッシュも新しいものに温め直す
+    if (mode === "midi" && rawNotes.length > 0) warmupMidiCache();
   },
 );
 
