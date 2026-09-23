@@ -737,7 +737,25 @@ function stopRaf() {
 // （＝曲の実尺が SHORT_DURATION/ノート消化タイミングと際どく重なる曲で、
 // リプレイ時にゲームが始まらない・スペースキーでようやく動く原因）を避ける。
 // なお pause() は「システム pause」（userInitiatedMidiPause は立てない）。
+//
+// 曲の実尺が SHORT_DURATION 以下（maxDuration===Infinity）の場合、ここに来る
+// 時点で midy は「フェードで強制中断された」のではなく、既に自然終了
+// （stopped: isPlaying=false, isPaused=false）していることがある。
+// この状態で pause() を呼ぶと、実際には再生も一時停止もしていないのに
+// isPaused だけが中途半端に true になり得て、次のリプレイ時に
+// startMidiPlayback() が「resume() で再開できる」と誤判定してしまう。
+// resume() は実際に鳴らすべき音源が無いため resumed イベントが発火せず、
+// gamePhase が "result" のまま固まって見える（＝pause画面は出ないのに
+// 始まらない不具合の原因）。
+// これを避けるため、midy がまだ実際に再生中のとき（＝SHORTのフェード
+// カットで中断する通常ケース）だけ pause() する。既に自然終了している
+// 場合は何もせず、次のリプレイは startMidiPlayback() 側の
+// 「midiHasStartedOnce なら必ず stop()→start()」経路に確実に任せる。
 function systemPauseMidi() {
+  if (!midy.isPlaying) {
+    systemPausePromise = null;
+    return Promise.resolve();
+  }
   const promise = midy.pause()
     .catch((err) => console.error("midy.pause failed:", err))
     .finally(() => {
