@@ -1032,9 +1032,19 @@
             <div class="modal-body">
               <div id="libraryCollections" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
               <div id="libraryInstruments" class="d-flex flex-wrap gap-1 mb-2 d-none"></div>
-              <div class="toolbar d-flex justify-content-end align-items-center gap-2">
-                <div>Powered by <a href="https://marmooo.github.io/free-midi/">Free MIDI</a></div>
-                <div id="libraryColumns" class="small"></div>
+              <div class="d-flex justify-content-between">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="libraryCategoryToggle">
+                  <div class="btn-group" role="group" aria-label="MIDI category">
+                    <input type="radio" class="btn-check" name="midiLibraryCategory" id="midiCategoryModern" value="modern" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary btn-sm" for="midiCategoryModern">Modern</label>
+                    <input type="radio" class="btn-check" name="midiLibraryCategory" id="midiCategoryClassical" value="classical" autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm" for="midiCategoryClassical">Classical</label>
+                  </div>
+                </div>
+                <div class="toolbar d-flex align-items-center gap-2 ms-auto">
+                  <div class="small d-none d-md-block">Powered by <a href="https://marmooo.github.io/free-midi/">Free MIDI</a></div>
+                  <div id="libraryColumns" class="small"></div>
+                </div>
               </div>
               <div class="table-responsive text-nowrap">
                 <table id="libraryTable" class="table table-striped table-hover table-bordered table-sm align-middle w-100">

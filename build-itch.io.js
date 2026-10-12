@@ -122,10 +122,33 @@ function transform(content) {
     `const SOUNDFONT_BASE = "./soundfont"`,
   );
 
-  // --- midi-db ---
+  // --- midi-db (modern / classical) ---
+  // index.js は MIDI_DB_MODERN / MIDI_DB_CLASSICAL の2定数。
+  // itch.io 同梱は INCLUDE_COLLECTIONS（midi-db 側）のみなので、両方を ./midi-db に寄せる。
+  // カテゴリ radio は offline では意味がないため非表示にする。
+  s = s.replace(
+    /const MIDI_DB_MODERN = "https:\/\/midi-db\.pages\.dev"/g,
+    `const MIDI_DB_MODERN = "./midi-db"`,
+  );
+  s = s.replace(
+    /const MIDI_DB_CLASSICAL = "https:\/\/marmooo\.github\.io\/classical-midi-db"/g,
+    `const MIDI_DB_CLASSICAL = "./midi-db"`,
+  );
+  // 後方互換（旧 const MIDI_DB が残っている場合）
   s = s.replace(
     /const MIDI_DB = "https:\/\/midi-db\.pages\.dev"/g,
     `const MIDI_DB = "./midi-db"`,
+  );
+  // 現代曲/クラシック切替 UI を itch.io では隠す
+  s = s.replace(
+    /(<div\b[^>]*\bid=["']libraryCategoryToggle["'][^>]*\bclass=["'])([^"']*)(["'])/gi,
+    (_, a, cls, b) =>
+      /\bd-none\b/.test(cls) ? a + cls + b : a + cls + " d-none" + b,
+  );
+  s = s.replace(
+    /(<div\b[^>]*\bclass=["'])([^"']*)(["'][^>]*\bid=["']libraryCategoryToggle["'])/gi,
+    (_, a, cls, b) =>
+      /\bd-none\b/.test(cls) ? a + cls + b : a + cls + " d-none" + b,
   );
 
   // --- /tip-tap-notes/ → ./ ---

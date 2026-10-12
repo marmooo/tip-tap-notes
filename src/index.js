@@ -24,7 +24,10 @@ import { installIOSTouchGuards } from "/tip-tap-notes/ios-touch-guards.js";
 // 定数
 // ---------------------------------------------------------------------------
 
-const MIDI_DB = "https://midi-db.pages.dev";
+const MIDI_DB_MODERN = "https://midi-db.pages.dev";
+const MIDI_DB_CLASSICAL = "https://marmooo.github.io/classical-midi-db";
+/** Currently selected MIDI DB base URL (modern or classical). */
+let currentMidiDb = MIDI_DB_MODERN;
 const SOUNDFONT_BASE = "https://soundfonts.pages.dev";
 
 // MIDI / 音声 共通の開始遅延。ノートが判定ラインに到達する前にスクロールインする
@@ -2091,7 +2094,7 @@ selectPanel.addEventListener("drop", (e) => {
 // ---------------------------------------------------------------------------
 
 const midiLibrary = new MidiLibrary({
-  midiDB: MIDI_DB,
+  midiDB: currentMidiDb,
   table: "libraryTable",
   pagination: "libraryPagination",
   columns: "libraryColumns",
@@ -2099,13 +2102,47 @@ const midiLibrary = new MidiLibrary({
   instruments: "libraryInstruments",
   lang: ["ja", "en"].includes(htmlLang) ? htmlLang : "en",
   onSelect: async (row) => {
-    const buf = await (await fetch(`${MIDI_DB}/${row.file}`))
+    const buf = await (await fetch(`${midiLibrary.midiDB}/${row.file}`))
       .arrayBuffer();
     await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
     libraryModal.hide();
   },
 });
 midiLibrary.load();
+
+/** Switch MIDI library between modern and classical collections. */
+let switchMidiCategoryBusy = false;
+async function switchMidiCategory(category) {
+  const nextDb = category === "classical" ? MIDI_DB_CLASSICAL : MIDI_DB_MODERN;
+  if (midiLibrary.midiDB === nextDb && midiLibrary.fullData) return;
+  if (switchMidiCategoryBusy) return;
+  switchMidiCategoryBusy = true;
+  try {
+    currentMidiDb = nextDb;
+    midiLibrary.midiDB = nextDb;
+    midiLibrary.collections.clear();
+    midiLibrary.fullData = null;
+    midiLibrary.destroy();
+    await midiLibrary.load();
+  } catch (err) {
+    console.error("Failed to switch MIDI category:", err);
+  } finally {
+    switchMidiCategoryBusy = false;
+  }
+}
+
+function initMidiCategoryRadios() {
+  const radios = document.querySelectorAll('input[name="midiLibraryCategory"]');
+  for (const radio of radios) {
+    radio.addEventListener("change", () => {
+      if (!radio.checked) return;
+      switchMidiCategory(radio.value).catch((err) =>
+        console.error("switchMidiCategory failed:", err)
+      );
+    });
+  }
+}
+initMidiCategoryRadios();
 
 // ---------------------------------------------------------------------------
 // 楽曲メタデータ（タイトル / 作者 / サイト / ライセンス）表示
@@ -2273,7 +2310,7 @@ async function playRandomLongMidi() {
   randomMidiBusy = true;
   setRandomMidiButtonsBusy(true);
   try {
-    const buf = await (await fetch(`${MIDI_DB}/${row.file}`))
+    const buf = await (await fetch(`${midiLibrary.midiDB}/${row.file}`))
       .arrayBuffer();
     await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
   } catch (err) {
