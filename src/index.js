@@ -205,7 +205,12 @@ function showPlayHud() {
   btnPause.classList.remove("hidden");
   btnPause.innerHTML = ICON_PAUSE;
   scoreDisplay?.classList.remove("hidden");
-  if (scoreDisplay) scoreDisplay.textContent = "0000000";
+  updateScoreDisplay(0);
+}
+function updateScoreDisplay(score) {
+  if (!scoreDisplay) return;
+  const text = String(Math.round(Number(score) || 0)).padStart(7, "0");
+  if (scoreDisplay.textContent !== text) scoreDisplay.textContent = text;
 }
 function hidePlayHud() {
   pauseOverlay.classList.add("hidden");
@@ -555,9 +560,11 @@ function onWorkerMessage(e) {
     case "judgment":
       lastResult.score = msg.score;
       lastResult.combo = Math.max(lastResult.combo, msg.combo);
+      updateScoreDisplay(msg.score);
       break;
     case "judgmentDetail":
       lastResult = { ...lastResult, ...msg };
+      updateScoreDisplay(msg.score);
       break;
     case "noteCount":
       document.getElementById("noteCountLabel").textContent = msg.count;
@@ -681,12 +688,6 @@ function startRaf() {
   if (rafId !== null) return;
   function loop() {
     gameLogicTick();
-    // スコアは "judgment" メッセージで lastResult.score に随時反映されるが、
-    // DOM 表示（#scoreDisplay）への書き戻しは毎フレームここでまとめて行う
-    // （以前は Canvas 側で毎フレーム再描画していたのと同じ頻度・同じ場所）。
-    if (scoreDisplay) {
-      scoreDisplay.textContent = String(lastResult.score).padStart(7, "0");
-    }
     // handleShortEnding() が showResult()→stopRaf() を呼んで rafId を null に
     // していたら、ここで再度スケジュールしてしまわないようにする。
     if (rafId !== null) rafId = requestAnimationFrame(loop);
