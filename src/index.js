@@ -696,9 +696,11 @@ function startRaf() {
 
   // タブがバックグラウンドだと rAF が停止／大幅間引きされる。
   // Worker のノート進行・ended 判定、SHORT の maxDuration 到達判定が止まるため、
-  // setInterval でも同じロジックを回す（裏で音楽が鳴っていても終了→スコア画面へ）。
+  // 非表示中だけ setInterval でも同じロジックを回す。前景中は rAF と重複させない。
   if (tickIntervalId === null) {
-    tickIntervalId = setInterval(gameLogicTick, 250);
+    tickIntervalId = setInterval(() => {
+      if (document.hidden) gameLogicTick();
+    }, 250);
   }
 }
 function stopRaf() {
