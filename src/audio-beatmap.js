@@ -763,6 +763,7 @@ const SPARSE_FILL = {
   BASIC: { everyNBeats: 2, energyThresh: 0.12, synthStrength: 0.35 },
   NORMAL: { everyNBeats: 1, energyThresh: 0.10, synthStrength: 0.38 },
   HARD: { everyNBeats: 1, energyThresh: 0.08, synthStrength: 0.42 },
+  EXPERT: { everyNBeats: 1, energyThresh: 0.06, synthStrength: 0.46 },
 };
 
 // ---------------------------------------------------------------------------
@@ -785,6 +786,7 @@ export const AUDIO_DIFFICULTIES = {
   BASIC: { subdivisions: 2, keepRatio: 0.50, sustainEnabled: true },
   NORMAL: { subdivisions: 2, keepRatio: 0.72, sustainEnabled: true },
   HARD: { subdivisions: 4, keepRatio: 0.95, sustainEnabled: true },
+  EXPERT: { subdivisions: 8, keepRatio: 1.0, sustainEnabled: true },
 };
 
 // ---------------------------------------------------------------------------
