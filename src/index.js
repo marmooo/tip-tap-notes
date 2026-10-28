@@ -2188,6 +2188,34 @@ function trackMetaFromLibraryRow(row) {
   return { title, composer, siteName, web, license };
 }
 
+/** ?q= で渡された MIDI の URL と、title / composer / maintainer / web / license を曲情報にする */
+function trackMetaFromQuery(query) {
+  return {
+    title: query.get("title") ?? "",
+    composer: query.get("composer") ?? "",
+    siteName: query.get("maintainer") ?? "",
+    web: query.get("web") ?? "",
+    license: query.get("license") ?? "",
+  };
+}
+
+async function loadMIDIFromQuery() {
+  const query = new URLSearchParams(location.search);
+  const url = query.get("q");
+  if (!url) return;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await loadMIDIBytes(bytes, trackMetaFromQuery(query));
+  } catch (error) {
+    console.error(`Failed to load ${url}:`, error);
+    alert(t("midiFromQueryFailedPrefix") + (error?.message || error));
+  }
+}
+
 function clearTrackMeta() {
   currentTrackMeta = null;
   updateTrackAttributionUI();
@@ -3105,3 +3133,5 @@ installIOSTouchGuards({
   shouldBlockSurface: () => gamePhase === "playing",
   styleElementId: "iosTouchGuardsStyle",
 });
+
+loadMIDIFromQuery();
