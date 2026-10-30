@@ -146,7 +146,7 @@
         padding: 0.2rem 0.45rem;
         border-radius: 0.4rem;
         text-align: center;
-        pointer-events: none;
+        min-width: 0; /* allow the grid item to shrink below content width for ellipsis */
         background: color-mix(in srgb, var(--bs-body-bg) 38%, transparent);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
@@ -461,6 +461,8 @@
       .hero-lane {
         flex: 1; position: relative;
         border-left: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+        /* Size container: cqh in heroFall is relative to lane height (not the note). */
+        container-type: size;
       }
       .hero-lane:last-child { border-right: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
 
@@ -490,6 +492,7 @@
         height: var(--note-h, 11px);
         border-radius: 1px;
         background: color-mix(in srgb, var(--note-color, #f76707) 28%, transparent);
+        transform: translateY(0);
       }
       .hero-judgeline {
         position: absolute; left: 6%; right: 6%; bottom: 21%; height: 2px;
@@ -502,13 +505,20 @@
           animation-timing-function: linear;
           animation-iteration-count: infinite;
         }
+        /* Fully stop (not just pause) when index.js sets html.hero-anim-off:
+           start screen left, or tab backgrounded. animation:none drops the
+           compositor work; play-state:paused alone can still cost CPU. */
+        html.hero-anim-off .hero-note {
+          animation: none !important;
+        }
       }
+      /* Same travel as old top: -70% → 112% (= +182% of lane height) */
       @keyframes heroFall {
-        from { top: -70%; }
-        to   { top: 112%; }
+        from { transform: translateY(0); }
+        to   { transform: translateY(182cqh); }
       }
       @media (prefers-reduced-motion: reduce) {
-        .hero-note { top: 45%; }
+        .hero-note { top: 45%; animation: none; transform: none; }
       }
 
       /* ---- ダークモード：発光を少し足す（常に文字の裏を通るので強くしすぎない） ---- */

@@ -856,6 +856,7 @@ function beginPlayback() {
   ) {
     s.classList.add("hidden");
   }
+  syncHeroAnimRunning();
   resultModal.hide();
   libraryModal.hide();
   soundFontModal.hide();
@@ -970,6 +971,21 @@ function applyConfigToGame(cfg) {
 }
 
 // ---------------------------------------------------------------------------
+// Start-screen hero CSS animation
+// ---------------------------------------------------------------------------
+// The falling-note backdrop is a pure CSS animation. It keeps running on the
+// compositor even when the start overlay is display:none or the tab is in the
+// background, which shows up as steady CPU use. index.js owns the on/off
+// switch via html.hero-anim-off (see #heroFallingNotesStyle in index.html).
+
+function syncHeroAnimRunning() {
+  const shouldRun = gamePhase === "start" && !document.hidden;
+  document.documentElement.classList.toggle("hero-anim-off", !shouldRun);
+}
+
+document.addEventListener("visibilitychange", syncHeroAnimRunning);
+
+// ---------------------------------------------------------------------------
 // Screen management
 // ---------------------------------------------------------------------------
 
@@ -998,6 +1014,7 @@ function showScreen(name) {
   hidePlayHud();
   setWrapHeight(); // gamePhase が変わったので、フルスクリーン⇄通常レイアウトを再計算する
   updateTrackAttributionUI();
+  syncHeroAnimRunning();
 }
 
 function showResult() {
@@ -3133,4 +3150,5 @@ installIOSTouchGuards({
   styleElementId: "iosTouchGuardsStyle",
 });
 
+syncHeroAnimRunning();
 loadMIDIFromQuery();
