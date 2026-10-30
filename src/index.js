@@ -10,7 +10,7 @@
  * rhythm-game-worker.js での判定/描画）は完全に共通。
  */
 
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.7.1/dist/midy.min.js";
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.7.2/dist/midy.min.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
   DIFFICULTIES,
@@ -1843,7 +1843,6 @@ function switchMode(next) {
 
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
-midy.prerollSec = 20;
 midy.cacheMode = CACHE_MODES.includes(config.cacheMode)
   ? config.cacheMode
   : "chunk";
