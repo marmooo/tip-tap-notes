@@ -883,7 +883,7 @@ export class RhythmGame {
     this.#judgedNotes++;
     this.#judgmentFx.push({ judgment, lane: note.lane, alpha: 1.0 });
     this.#uiDirty = true;
-    this.onJudgment?.(judgment, this.#combo, this.#score);
+    this.onJudgment?.(judgment, this.#combo, this.#score, note.lane);
   }
 
   // ---- Private: FX -------------------------------------------------------

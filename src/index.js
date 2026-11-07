@@ -300,6 +300,8 @@ let lastResult = {
   miss: 0,
   total: 0,
 };
+// Judgment order powers the result card's compact play-history timeline.
+let playHistory = [];
 let pendingAnalysisResolve = null;
 let pendingAnalysisReject = null;
 
@@ -558,6 +560,7 @@ function onWorkerMessage(e) {
   const msg = e.data;
   switch (msg.type) {
     case "judgment":
+      playHistory.push({ judgment: msg.judgment, lane: msg.lane });
       lastResult.score = msg.score;
       lastResult.combo = Math.max(lastResult.combo, msg.combo);
       updateScoreDisplay(msg.score);
@@ -827,6 +830,7 @@ function ensureWorker() {
 }
 
 function beginPlayback() {
+  playHistory = [];
   endingFadeStarted = false;
   endingFadeStartPerf = 0;
   if (endingFadeTimeoutId !== null) {
@@ -905,6 +909,7 @@ function applyConfigToGame(cfg) {
 
   if (gamePhase === "playing" && !endingFadeStarted) {
     if (structuralChanged || laneOrDiffChanged) {
+      playHistory = [];
       // 譜面配置やレーン構造が変わるので Worker を立て直して notes を再送
       stopRaf();
       buildGame();
@@ -1080,8 +1085,223 @@ function showResult() {
   if (rLanes) rLanes.textContent = String(config.laneCount);
   if (rScroll) rScroll.textContent = String(config.scrollSpeed);
 
+  drawScoreCard(grade, accStr);
+
   showScreen("result");
 }
+
+function drawScoreCard(grade, accuracy) {
+  const canvas = document.getElementById("scoreCardCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const palette = {
+    perfect: "#66b8ff",
+    great: "#64d98b",
+    good: "#ffd166",
+    miss: "#ff5b61",
+  };
+  const gradeColors = {
+    S: "#ffd166",
+    A: "#64d98b",
+    B: "#66b8ff",
+    C: "#ff9a64",
+    D: "#ff5b61",
+  };
+  const accent = gradeColors[grade] || palette.perfect;
+
+  // A circular score signature: one mark per recent judgment, advancing clockwise.
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, "#10151b");
+  bg.addColorStop(0.58, "#151d22");
+  bg.addColorStop(1, "#0d1116");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  const glow = ctx.createRadialGradient(870, 315, 10, 870, 315, 560);
+  glow.addColorStop(0, "#66b8ff16");
+  glow.addColorStop(1, "#66b8ff00");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  // Keep the product wordmark's exact casing.
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(66, 70, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = "800 72px system-ui, sans-serif";
+  ctx.fillStyle = "#f5f4ec";
+  ctx.fillText("Tip ", 88, 101);
+  const tapX = 88 + ctx.measureText("Tip ").width;
+  ctx.fillStyle = palette.perfect;
+  ctx.fillText("Tap ", tapX, 101);
+  const notesX = tapX + ctx.measureText("Tap ").width;
+  ctx.fillStyle = "#f5f4ec";
+  ctx.fillText("Notes", notesX, 101);
+  ctx.font = "600 24px system-ui, sans-serif";
+  ctx.fillStyle = "#aab5b5";
+  ctx.fillText(`${config.difficulty}   ·   ${config.laneCount} LANES`, 88, 141);
+
+  // Left column: the score leads, with accuracy, combo, and judgment counts.
+  const history = playHistory.slice(-100);
+  ctx.font = "700 22px system-ui, sans-serif";
+  ctx.fillStyle = "#aab5b5";
+  ctx.fillText("SCORE", 76, 190);
+  ctx.font = "800 72px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillStyle = "#f5f4ec";
+  ctx.fillText(String(lastResult.score).padStart(7, "0"), 72, 250);
+  ctx.font = "700 22px system-ui, sans-serif";
+  ctx.fillStyle = "#aab5b5";
+  ctx.fillText("ACCURACY", 76, 310);
+  ctx.font = "800 68px system-ui, sans-serif";
+  ctx.fillStyle = "#f5f4ec";
+  ctx.fillText(`${accuracy}%`, 72, 370);
+  ctx.font = "700 22px system-ui, sans-serif";
+  ctx.fillStyle = "#aab5b5";
+  ctx.fillText("BEST COMBO", 76, 430);
+  ctx.font = "800 58px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillStyle = "#f5f4ec";
+  ctx.fillText(String(lastResult.combo), 72, 490);
+  const stats = [
+    ["PERFECT", lastResult.perfect, palette.perfect],
+    ["GREAT", lastResult.great, palette.great],
+    ["GOOD", lastResult.good, palette.good],
+    ["MISS", lastResult.miss, palette.miss],
+  ];
+  for (const [i, [label, value, color]] of stats.entries()) {
+    const x = 76 + i * 103;
+    ctx.font = "700 20px system-ui, sans-serif";
+    ctx.fillStyle = color;
+    ctx.fillText(label, x, 550);
+    ctx.font = "800 30px system-ui, sans-serif";
+    ctx.fillText(String(value), x, 580);
+  }
+
+  // The halo is a chronological ring, not a lane map. Shape and radius both
+  // change with judgment, so the play pattern remains legible without relying
+  // on color alone.
+  const center = { x: 870, y: 315 };
+
+  for (const radius of [185, 310]) {
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = radius === 185 ? "#ffffff25" : "#ffffff18";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  // A sparse set of quiet hour marks gives the circle a clock-like orientation.
+  for (let i = 0; i < 12; i++) {
+    const angle = -Math.PI / 2 + i * Math.PI / 6;
+    const inner = 314, outer = i % 3 === 0 ? 330 : 323;
+    ctx.beginPath();
+    ctx.moveTo(
+      center.x + Math.cos(angle) * inner,
+      center.y + Math.sin(angle) * inner,
+    );
+    ctx.lineTo(
+      center.x + Math.cos(angle) * outer,
+      center.y + Math.sin(angle) * outer,
+    );
+    ctx.strokeStyle = "#ffffff35";
+    ctx.lineWidth = i % 3 === 0 ? 2 : 1;
+    ctx.stroke();
+  }
+
+  const radii = { perfect: 205, great: 235, good: 265, miss: 295 };
+  history.forEach((event, index) => {
+    const key = String(event.judgment).toLowerCase();
+    const angle = -Math.PI / 2 +
+      index * (Math.PI * 2 / Math.max(1, history.length));
+    const radius = radii[key] || 140;
+    const x = center.x + Math.cos(angle) * radius;
+    const y = center.y + Math.sin(angle) * radius;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = palette[key] || "#aab4b3";
+    ctx.strokeStyle = ctx.fillStyle;
+    if (key === "perfect") {
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, 6.4, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.32;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    } else if (key === "great") {
+      ctx.lineCap = "round";
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-5, 0);
+      ctx.lineTo(5, 0);
+      ctx.stroke();
+    } else if (key === "good") {
+      ctx.beginPath();
+      ctx.moveTo(0, -5);
+      ctx.lineTo(4, 0);
+      ctx.lineTo(0, 5);
+      ctx.lineTo(-4, 0);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.lineCap = "round";
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.moveTo(-3.5, -3.5);
+      ctx.lineTo(3.5, 3.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(3.5, -3.5);
+      ctx.lineTo(-3.5, 3.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  // The center carries the result; the surrounding ring carries the run.
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, 155, 0, Math.PI * 2);
+  ctx.fillStyle = "#111820";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff30";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.font = "700 22px system-ui, sans-serif";
+  ctx.fillStyle = "#aab5b5";
+  ctx.fillText("RANK", center.x, center.y - 77);
+  ctx.font = "900 160px system-ui, sans-serif";
+  ctx.fillStyle = accent;
+  ctx.fillText(grade, center.x, center.y + 58);
+  ctx.textAlign = "left";
+}
+
+function scoreCardFileName() {
+  return `tip-tap-notes-${new Date().toISOString().slice(0, 10)}.png`;
+}
+
+function downloadScoreCard(blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = scoreCardFileName();
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById("btnSaveScore")?.addEventListener("click", () => {
+  const canvas = document.getElementById("scoreCardCanvas");
+  canvas?.toBlob((blob) => blob && downloadScoreCard(blob), "image/png");
+});
+
+document.getElementById("btnShareScore")?.addEventListener("click", () => {
+  const text =
+    `Tip Tap Notes: ${lastResult.score} points · ${config.difficulty}`;
+  const url = `https://twitter.com/intent/tweet?text=${
+    encodeURIComponent(text)
+  }&url=${encodeURIComponent("https://marmooo.github.io/tip-tap-notes/")}`;
+  globalThis.open(url, "_blank", "noopener,noreferrer");
+});
 
 // ---------------------------------------------------------------------------
 // Key hints
@@ -2522,6 +2742,7 @@ midy.addEventListener("stopped", () => {
 midy.addEventListener("seeked", () => {
   if (mode !== "midi" || gamePhase !== "playing") return;
   worker.postMessage({ type: "start" });
+  playHistory = [];
   lastResult = { ...lastResult, score: 0, combo: 0 };
   worker.postMessage({
     type: "tick",
@@ -2532,6 +2753,7 @@ midy.addEventListener("seeked", () => {
 midy.addEventListener("looped", () => {
   if (mode !== "midi") return;
   worker.postMessage({ type: "start" });
+  playHistory = [];
   lastResult = {
     score: 0,
     combo: 0,
@@ -2713,6 +2935,7 @@ function beginAudioRound() {
       miss: 0,
       total: laneNotes.length,
     };
+    playHistory = [];
     worker?.postMessage({ type: "start" });
     isPaused = false;
     showPlayHud();
