@@ -2424,30 +2424,48 @@ function trackMetaFromLibraryRow(row) {
   return { title, composer, siteName, web, license };
 }
 
-/** ?q= で渡された MIDI の URL と、title / composer / maintainer / web / license を曲情報にする */
-function trackMetaFromQuery(query) {
-  return {
-    title: query.get("title") ?? "",
-    composer: query.get("composer") ?? "",
-    siteName: query.get("maintainer") ?? "",
-    web: query.get("web") ?? "",
-    license: query.get("license") ?? "",
-  };
-}
-
+/**
+ * ?c=<siteId>&i=<index>（classical は &db=c）から曲を読み込む。
+ * free-midi からの共有リンク専用（旧 ?q= は廃止）。
+ */
 async function loadMIDIFromQuery() {
   const query = new URLSearchParams(location.search);
-  const url = query.get("q");
-  if (!url) return;
+  const collectionId = query.get("c");
+  const index = Number.parseInt(query.get("i") ?? "", 10);
+  if (!collectionId || !Number.isInteger(index) || index < 0) return;
+
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
+    const dbBase = query.get("db") === "c" ? MIDI_DB_CLASSICAL : MIDI_DB_MODERN;
+    const lang = ["ja", "en"].includes(htmlLang) ? htmlLang : "en";
+    const listUrl = `${dbBase}/json/${
+      encodeURIComponent(collectionId)
+    }/${lang}.json`;
+    const list = await (await fetch(listUrl)).json();
+    const row = list[index];
+    if (!row?.file) {
+      throw new Error(`MIDI not found: ${collectionId}#${index}`);
     }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    await loadMIDIBytes(bytes, trackMetaFromQuery(query));
+
+    const col = midiLibrary.collections?.get(collectionId);
+    if (col) {
+      if (!row.collection) row.collection = col.name;
+      if (!row.composer && col.composer) row.composer = col.composer;
+      if (!row.web && col.web) row.web = col.web;
+      if (!row.license && col.license) row.license = col.license;
+    }
+    row.collectionId = collectionId;
+    row.index = index;
+
+    if (dbBase !== midiLibrary.midiDB) {
+      currentMidiDb = dbBase;
+      midiLibrary.midiDB = dbBase;
+    }
+
+    const midiUrl = `${dbBase}/${row.file}`;
+    const buf = await (await fetch(midiUrl)).arrayBuffer();
+    await loadMIDIBytes(new Uint8Array(buf), trackMetaFromLibraryRow(row));
   } catch (error) {
-    console.error(`Failed to load ${url}:`, error);
+    console.error("Failed to load MIDI from query:", error);
     alert(t("midiFromQueryFailedPrefix") + (error?.message || error));
   }
 }
