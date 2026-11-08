@@ -433,6 +433,16 @@
 
       #resultTable td { padding: 2px 14px; }
       #resultTable .label { color: var(--bs-secondary-color); }
+      #resultTable .judgment-perfect { color: #66b8ff; }
+      #resultTable .judgment-great { color: #64d98b; }
+      #resultTable .judgment-good { color: #ffd166; }
+      #resultTable .judgment-miss { color: #ff5b61; }
+
+      #scoreCardCanvas {
+        display: block; width: 100%; max-width: 720px; height: auto;
+        margin: 0 auto 1rem; border-radius: 10px;
+        box-shadow: 0 16px 44px #0004;
+      }
 
       audio#player { width: 100%; height: 36px; }
       #analyzingProgressWrap { width: 240px; }
@@ -735,7 +745,7 @@
 
         <!-- Result screen -->
         <div class="modal" id="screenResult" tabindex="-1" aria-labelledby="screenResultLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
             <div class="modal-content text-center">
               <div class="modal-header justify-content-center border-0 pb-0">
                 <div>
@@ -744,14 +754,20 @@
                 </div>
               </div>
               <div class="modal-body pt-2">
+                <canvas id="scoreCardCanvas" width="1200" height="630"
+                        role="img" aria-label="Score card showing your play history"></canvas>
+                <div class="d-flex gap-2 justify-content-center mb-3">
+                  <button id="btnShareScore" type="button" class="btn btn-sm btn-outline-primary rounded-pill" aria-label="Share score on X"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" class="me-1 align-text-bottom"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3L12 14.6 5.5 22H2.3l7.3-8.4L1.8 2h6.5l4.5 6.8L18.9 2Zm-1.1 18h1.7L7.3 3.9H5.5L17.8 20Z"/></svg>Share on X</button>
+                  <button id="btnSaveScore" type="button" class="btn btn-sm btn-outline-secondary rounded-pill"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" class="me-1 align-text-bottom"><path fill="currentColor" d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5z"/></svg>Save PNG</button>
+                </div>
                 <table id="resultTable" class="mx-auto mb-0 small">
                   <tr><td class="label">Score</td>    <td id="rScore"    class="text-end fw-bold"></td></tr>
                   <tr><td class="label">Accuracy</td> <td id="rAccuracy" class="text-end"></td></tr>
                   <tr><td class="label">Max Combo</td><td id="rCombo"    class="text-end"></td></tr>
-                  <tr><td class="label">Perfect</td>  <td id="rPerfect"  class="text-end text-warning-emphasis"></td></tr>
-                  <tr><td class="label">Great</td>    <td id="rGreat"    class="text-end text-success-emphasis"></td></tr>
-                  <tr><td class="label">Good</td>     <td id="rGood"     class="text-end text-info-emphasis"></td></tr>
-                  <tr><td class="label">Miss</td>     <td id="rMiss"     class="text-end text-danger-emphasis"></td></tr>
+                  <tr><td class="label judgment-perfect">Perfect</td>  <td id="rPerfect" class="text-end judgment-perfect"></td></tr>
+                  <tr><td class="label judgment-great">Great</td>    <td id="rGreat" class="text-end judgment-great"></td></tr>
+                  <tr><td class="label judgment-good">Good</td>     <td id="rGood" class="text-end judgment-good"></td></tr>
+                  <tr><td class="label judgment-miss">Miss</td>     <td id="rMiss" class="text-end judgment-miss"></td></tr>
                   <tr><td class="label">Difficulty</td><td id="rDifficulty" class="text-end"></td></tr>
                   <tr><td class="label">Lanes</td>   <td id="rLanes"     class="text-end"></td></tr>
                   <tr><td class="label">Scroll</td>  <td id="rScrollSpeed" class="text-end"></td></tr>
