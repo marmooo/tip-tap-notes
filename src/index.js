@@ -1146,22 +1146,22 @@ function drawScoreCard(grade, accuracy) {
   // SCORE/ACCURACY は BEST COMBO と同じ 58px。判定・曲名と被らない程度に少し詰める
   ctx.font = "700 22px system-ui, sans-serif";
   ctx.fillStyle = "#aab5b5";
-  ctx.fillText("SCORE", 76, 186);
+  ctx.fillText("SCORE", 76, 184);
   ctx.font = "800 58px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.fillStyle = "#f5f4ec";
-  ctx.fillText(String(lastResult.score).padStart(7, "0"), 72, 240);
+  ctx.fillText(String(lastResult.score).padStart(7, "0"), 72, 236);
   ctx.font = "700 22px system-ui, sans-serif";
   ctx.fillStyle = "#aab5b5";
-  ctx.fillText("ACCURACY", 76, 292);
+  ctx.fillText("ACCURACY", 76, 287);
   ctx.font = "800 58px system-ui, sans-serif";
   ctx.fillStyle = "#f5f4ec";
-  ctx.fillText(`${accuracy}%`, 72, 346);
+  ctx.fillText(`${accuracy}%`, 72, 340);
   ctx.font = "700 22px system-ui, sans-serif";
   ctx.fillStyle = "#aab5b5";
-  ctx.fillText("BEST COMBO", 76, 398);
+  ctx.fillText("BEST COMBO", 76, 391);
   ctx.font = "800 58px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.fillStyle = "#f5f4ec";
-  ctx.fillText(String(lastResult.combo), 72, 452);
+  ctx.fillText(String(lastResult.combo), 72, 444);
   const stats = [
     ["PERFECT", lastResult.perfect, palette.perfect],
     ["GREAT", lastResult.great, palette.great],
@@ -1172,9 +1172,9 @@ function drawScoreCard(grade, accuracy) {
     const x = 76 + i * 103;
     ctx.font = "700 20px system-ui, sans-serif";
     ctx.fillStyle = color;
-    ctx.fillText(label, x, 510);
+    ctx.fillText(label, x, 500);
     ctx.font = "800 30px system-ui, sans-serif";
-    ctx.fillText(String(value), x, 542);
+    ctx.fillText(String(value), x, 530);
   }
 
   // The halo is a chronological ring, not a lane map. Shape and radius both
@@ -1279,7 +1279,7 @@ function drawScoreCard(grade, accuracy) {
   // 曲名 · サイト名（左下・幅内折り返し）
   ctx.font = "600 22px system-ui, sans-serif";
   ctx.fillStyle = "#aab5b5";
-  drawWrappedTrackLabel(ctx, 72, h - 48, Math.min(560, w * 0.48), 24, 2);
+  drawWrappedTrackLabel(ctx, 72, h - 56, Math.min(560, w * 0.48), 24, 2);
 }
 
 /** 指定幅に収まるよう省略（…）付きで返す */
