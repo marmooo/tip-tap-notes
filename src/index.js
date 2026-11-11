@@ -1380,8 +1380,9 @@ document.getElementById("btnShareScore")?.addEventListener("click", () => {
   const text = track
     ? `Tip Tap Notes: ${lastResult.score} points · ${config.difficulty} · ${track}`
     : `Tip Tap Notes: ${lastResult.score} points · ${config.difficulty}`;
+  const textForX = text.replaceAll("@", "@\u200B");
   const url = `https://twitter.com/intent/tweet?text=${
-    encodeURIComponent(text)
+    encodeURIComponent(textForX)
   }&url=${encodeURIComponent(shareUrl)}`;
   globalThis.open(url, "_blank", "noopener,noreferrer");
 });
