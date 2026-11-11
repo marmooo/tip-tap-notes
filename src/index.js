@@ -894,6 +894,20 @@ function applyConfigToGame(cfg) {
       JSON.stringify(config.laneKeys?.slice(0, config.laneCount));
 
   config = cfg;
+  if (laneOrDiffChanged) {
+    if (typeof updateDocumentTitle === "function") updateDocumentTitle();
+    const params = new URLSearchParams(location.search);
+    if (params.has("c") && params.has("i")) {
+      const diff = config.difficulty || "NORMAL";
+      if (DIFFICULTIES[diff]) params.set("d", diff);
+      else params.delete("d");
+      history.replaceState(
+        null,
+        "",
+        `${location.pathname}?${params.toString()}${location.hash || ""}`,
+      );
+    }
+  }
   // maxPixelRatio 変更時は実効 dpr を更新（構造変更時は後続の buildGame で反映）
   if (dprChanged) dpr = computeDpr();
   // MIDI サンプルキャッシュ粒度（再生中でも次回ボイス生成から効く）
@@ -2425,6 +2439,8 @@ function getShareUrl() {
     share.set("c", params.get("c"));
     share.set("i", params.get("i"));
     if (params.get("db") === "c") share.set("db", "c");
+    const diff = config.difficulty || "NORMAL";
+    if (DIFFICULTIES[diff]) share.set("d", diff);
     return `${location.origin}${location.pathname}?${share.toString()}`;
   }
   return `${location.origin}${location.pathname}`;
@@ -2441,6 +2457,8 @@ function updateUrlFromLibraryRow(row) {
   params.set("c", c);
   params.set("i", String(i));
   if (midiLibrary.midiDB === MIDI_DB_CLASSICAL) params.set("db", "c");
+  const diff = config.difficulty || "NORMAL";
+  if (DIFFICULTIES[diff]) params.set("d", diff);
   const url = `${location.pathname}?${params.toString()}${location.hash || ""}`;
   history.replaceState(null, "", url);
 }
@@ -2556,6 +2574,15 @@ async function loadMIDIFromQuery() {
   const collectionId = query.get("c");
   const index = Number.parseInt(query.get("i") ?? "", 10);
   if (!collectionId || !Number.isInteger(index) || index < 0) return;
+
+  // 共有リンクの難易度を反映（不正値は無視）
+  const d = query.get("d");
+  if (d && DIFFICULTIES[d]) {
+    config.difficulty = d;
+    const diffEl = document.getElementById("difficulty");
+    if (diffEl) diffEl.value = d;
+    if (typeof updateDocumentTitle === "function") updateDocumentTitle();
+  }
 
   try {
     const dbBase = query.get("db") === "c" ? MIDI_DB_CLASSICAL : MIDI_DB_MODERN;
