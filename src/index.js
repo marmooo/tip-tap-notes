@@ -1370,6 +1370,22 @@ function formatTrackShareLabel(maxChars = 48) {
   return t || site;
 }
 
+/** タブタイトル: アプリ名固定 + 曲情報 + 難易度 */
+function updateDocumentTitle() {
+  const meta = currentTrackMeta;
+  const title = (meta?.title || "").trim();
+  const site = (meta?.siteName || "").trim();
+  const diff = config.difficulty || "NORMAL";
+  const parts = [];
+  if (title) parts.push(title);
+  if (site) parts.push(site);
+  if (parts.length > 0) {
+    document.title = `Tip Tap Notes: ${parts.join(" · ")} · ${diff}`;
+  } else {
+    document.title = "Tip Tap Notes";
+  }
+}
+
 function scoreCardFileName() {
   return `tip-tap-notes-${new Date().toISOString().slice(0, 10)}.png`;
 }
@@ -1392,7 +1408,7 @@ document.getElementById("btnShareScore")?.addEventListener("click", () => {
   const shareUrl = getShareUrl();
   const track = formatTrackShareLabel(48);
   const text = track
-    ? `Tip Tap Notes: ${lastResult.score} points · ${config.difficulty} · ${track}`
+    ? `Tip Tap Notes: ${lastResult.score} points · ${track} · ${config.difficulty}`
     : `Tip Tap Notes: ${lastResult.score} points · ${config.difficulty}`;
   const textForX = text.replaceAll("@", "@\u200B");
   const url = `https://twitter.com/intent/tweet?text=${
@@ -1754,6 +1770,7 @@ function goToStartScreen() {
   if (gamePhase === "playing") stopRaf();
   stopAllPlayback();
   clearTrackMeta();
+  clearLibraryUrl();
   showScreen("start");
 }
 document.getElementById("btnChangeFileReady").addEventListener(
@@ -2623,6 +2640,7 @@ async function loadMIDIFromQuery() {
 function clearTrackMeta() {
   currentTrackMeta = null;
   updateTrackAttributionUI();
+  updateDocumentTitle();
 }
 
 function setTrackMeta(meta) {
@@ -2637,6 +2655,7 @@ function setTrackMeta(meta) {
     }
     : null;
   updateTrackAttributionUI();
+  updateDocumentTitle();
 }
 
 function updateTrackAttributionUI() {
