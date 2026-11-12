@@ -1047,8 +1047,14 @@ function showScreen(name) {
     return;
   }
   if (name === "library") {
+    ensureMidiLibraryLoaded();
     libraryModal.show();
     return;
+  }
+  // タイトルへ戻るタイミングで遅延していたライブラリ JSON を読み込む
+  // （起動時の showScreen("start") や既に start の再表示では読まない）
+  if (name === "start" && gamePhase !== "start") {
+    ensureMidiLibraryLoaded();
   }
   gamePhase = name;
   screenStart.classList.toggle("hidden", name !== "start");
@@ -2541,7 +2547,36 @@ const midiLibrary = new MidiLibrary({
     libraryModal.hide();
   },
 });
-midiLibrary.load();
+
+// ?c=&i= の共有リンクでは対象曲の JSON + MIDI だけで足りる。
+// collections.json と全コレクション JSON はタイトルへ戻る／ライブラリを
+// 開く／ランダム選曲する瞬間まで遅延読み込みする。
+function hasShareMidiQuery() {
+  const q = new URLSearchParams(location.search);
+  const collectionId = q.get("c");
+  const index = Number.parseInt(q.get("i") ?? "", 10);
+  return Boolean(collectionId) && Number.isInteger(index) && index >= 0;
+}
+
+/** @type {Promise<void> | null} */
+let midiLibraryLoadPromise = null;
+
+function ensureMidiLibraryLoaded() {
+  if (midiLibrary.fullData) return Promise.resolve();
+  if (midiLibraryLoadPromise) return midiLibraryLoadPromise;
+  midiLibraryLoadPromise = midiLibrary.load()
+    .catch((err) => {
+      console.error("Failed to load MIDI library:", err);
+      // 失敗時は再試行できるようにする
+      midiLibraryLoadPromise = null;
+      throw err;
+    });
+  return midiLibraryLoadPromise;
+}
+
+if (!hasShareMidiQuery()) {
+  ensureMidiLibraryLoaded();
+}
 
 /** Switch MIDI library between modern and classical collections. */
 let switchMidiCategoryBusy = false;
@@ -2556,7 +2591,8 @@ async function switchMidiCategory(category) {
     midiLibrary.collections.clear();
     midiLibrary.fullData = null;
     midiLibrary.destroy();
-    await midiLibrary.load();
+    midiLibraryLoadPromise = null;
+    await ensureMidiLibraryLoaded();
   } catch (err) {
     console.error("Failed to switch MIDI category:", err);
   } finally {
@@ -2576,6 +2612,14 @@ function initMidiCategoryRadios() {
   }
 }
 initMidiCategoryRadios();
+
+// data-bs-toggle 経由でライブラリを開いたときも遅延ロードを発火する
+document.getElementById("screenLibrary")?.addEventListener(
+  "show.bs.modal",
+  () => {
+    ensureMidiLibraryLoaded();
+  },
+);
 
 // ---------------------------------------------------------------------------
 // 楽曲メタデータ（タイトル / 作者 / サイト / ライセンス）表示
@@ -2783,6 +2827,12 @@ function setRandomMidiButtonsBusy(busy) {
 
 async function playRandomLongMidi() {
   if (randomMidiBusy) return;
+  try {
+    await ensureMidiLibraryLoaded();
+  } catch {
+    alert(t("randomMidiStillLoading"));
+    return;
+  }
   const data = midiLibrary.fullData;
   if (!data || data.length === 0) {
     alert(t("randomMidiStillLoading"));
