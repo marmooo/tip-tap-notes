@@ -260,6 +260,34 @@ const resultModal = Modal.getOrCreateInstance(screenResult, {
   backdrop: "static",
   keyboard: false,
 });
+
+// モーダル内にフォーカスが残ったまま aria-hidden が付くと Chrome が警告する。
+// hide 開始時にフォーカスを外して、支援技術向けの隠れ要素にフォーカスが残らないようにする。
+function blurActiveElementInside(root) {
+  const ae = document.activeElement;
+  if (
+    ae &&
+    root instanceof Element &&
+    root.contains(ae) &&
+    typeof ae.blur === "function"
+  ) {
+    ae.blur();
+  }
+}
+for (
+  const modalEl of [
+    screenResult,
+    screenSettings,
+    document.getElementById("screenLibrary"),
+    document.getElementById("soundFontLibraryModal"),
+  ]
+) {
+  if (!modalEl) continue;
+  modalEl.addEventListener("hide.bs.modal", () => {
+    blurActiveElementInside(modalEl);
+  });
+}
+
 const htmlLang = document.documentElement.lang || "en";
 
 // ---------------------------------------------------------------------------
