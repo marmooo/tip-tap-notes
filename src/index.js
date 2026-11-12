@@ -13,8 +13,11 @@
 import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.7.3/dist/midy.wasm.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
+  ANIMAL_EMOJIS,
   DIFFICULTIES,
   extractNotesFromMidy,
+  FOOD_EMOJIS,
+  OBJECT_EMOJIS,
   thinNotes,
 } from "./rhythm-game.js";
 import { MidiLibrary } from "https://marmooo.github.io/free-midi/midi-library.js";
@@ -39,6 +42,20 @@ const JUDGMENT_WINDOWS = {
   great: 80,
   good: 150,
 };
+
+/** noteType → 絵文字配列。tile のときは空（描画で使わない）。 */
+function getEmojisForType(noteType) {
+  switch (noteType) {
+    case "animal":
+      return ANIMAL_EMOJIS;
+    case "object":
+      return OBJECT_EMOJIS;
+    case "food":
+      return FOOD_EMOJIS;
+    default:
+      return [];
+  }
+}
 
 // rhythm-game.js のレーン描画は perspective 分だけ台形状に収束する。
 // pointerdown の座標→レーン変換もこれに合わせて逆変換する（#perspX の逆変換）。
@@ -87,6 +104,7 @@ const DEFAULT_CONFIG = {
   difficulty: "NORMAL",
   laneOpacity: 0.35, // 0(透明)〜1(最大まで濃い) の通常の opacity と同じスケール
   perspectiveEnabled: true, // 遠近感（画面上側が狭くなる表示）のON/OFF
+  noteType: "tile", // "tile" | "food" | "animal" | "object"
   judgeOffset: 0, // ms (正=遅く/音が遅い環境, 負=早く)
   accentColor: "", // "" = 未設定（currentColor に自動追従。テーマ切替でも見えなくならない）
   judgeLineColor: "", // "" = 未設定（uiColor / currentColor に自動追従）
@@ -122,6 +140,15 @@ function loadConfig() {
       ...DEFAULT_CONFIG,
       ...JSON.parse(localStorage.getItem("TipTapNotesConfig") || "{}"),
     };
+    // 旧 emojiMode (boolean) → noteType への移行
+    if (loaded.noteType == null && typeof loaded.emojiMode === "boolean") {
+      loaded.noteType = loaded.emojiMode ? "food" : "tile";
+    }
+    if (!["tile", "food", "animal", "object"].includes(loaded.noteType)) {
+      loaded.noteType = "tile";
+    }
+    delete loaded.emojiMode;
+
     // 過去の不具合で laneKeys: [] が保存されている場合にキーコンフィグが
     // 全滅しないよう、空・不足分は既定値で補完する。
     if (!Array.isArray(loaded.laneKeys) || loaded.laneKeys.length === 0) {
@@ -456,6 +483,8 @@ function buildWorkerOptions() {
     laneOpacity: config.laneOpacity ?? 0.35,
     buttonZoneHeight: Math.round(h * 0.2),
     perspective: (config.perspectiveEnabled ?? true) ? PERSPECTIVE : 0,
+    noteType: config.noteType ?? "tile",
+    emojis: getEmojisForType(config.noteType ?? "tile"),
     uiColor: computeUiColor(),
     judgeLineColor: config.judgeLineColor || "",
     laneLineColor: config.laneLineColor || "",
@@ -954,6 +983,8 @@ function applyConfigToGame(cfg) {
           laneLineColor: config.laneLineColor || "",
           accentColor: config.accentColor || "",
           laneOpacity: config.laneOpacity ?? 0.35,
+          noteType: config.noteType ?? "tile",
+          emojis: getEmojisForType(config.noteType ?? "tile"),
         },
       });
     }
@@ -977,6 +1008,8 @@ function applyConfigToGame(cfg) {
           laneOpacity: config.laneOpacity ?? 0.35,
           scrollSpeed: config.scrollSpeed,
           perspective: (config.perspectiveEnabled ?? true) ? PERSPECTIVE : 0,
+          noteType: config.noteType ?? "tile",
+          emojis: getEmojisForType(config.noteType ?? "tile"),
         },
       });
     }
@@ -1541,6 +1574,7 @@ function readSettingsUI() {
         : config.laneLineColor ?? "",
     perspectiveEnabled:
       document.getElementById("perspectiveEnabled")?.checked ?? true,
+    noteType: document.getElementById("noteType")?.value || "tile",
     laneOpacity: parseFloat(
       document.getElementById("laneOpacity")?.value ?? "0.35",
     ),
@@ -1593,6 +1627,8 @@ function openSettings() {
   sv("difficulty", config.difficulty);
   const persEl = document.getElementById("perspectiveEnabled");
   if (persEl) persEl.checked = config.perspectiveEnabled ?? true;
+  const noteTypeEl = document.getElementById("noteType");
+  if (noteTypeEl) noteTypeEl.value = config.noteType ?? "tile";
   const joEl = document.getElementById("judgeOffset");
   if (joEl) {
     joEl.value = config.judgeOffset ?? 0;

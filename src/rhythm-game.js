@@ -372,6 +372,9 @@ export function thinNotes(
     );
   }
 
+  // 絵文字インデックスをノート単位でランダム割り当て（noteNumber 偏りを避ける）
+  assignEmojiIndices(result);
+
   return result;
 }
 
@@ -423,6 +426,563 @@ const DEFAULT_LANE_COLORS = [
   "#66ffcc",
   "#ff66cc",
 ];
+
+// 食べ物・飲み物関連の Unicode 絵文字（Food & Drink / 関連記号）
+export const FOOD_EMOJIS = [
+  // 果物
+  "🍇",
+  "🍈",
+  "🍉",
+  "🍊",
+  "🍋",
+  "🍌",
+  "🍍",
+  "🥭",
+  "🍎",
+  "🍏",
+  "🍐",
+  "🍑",
+  "🍒",
+  "🍓",
+  "🫐",
+  "🥝",
+  "🍅",
+  "🫒",
+  "🥥",
+  // 野菜
+  "🥑",
+  "🍆",
+  "🥔",
+  "🥕",
+  "🌽",
+  "🌶️",
+  "🫑",
+  "🥒",
+  "🥬",
+  "🥦",
+  "🧄",
+  "🧅",
+  "🍄",
+  "🥜",
+  "🫘",
+  "🌰",
+  // パン・穀物・チーズ・卵・肉素材
+  "🍞",
+  "🥐",
+  "🥖",
+  "🫓",
+  "🥨",
+  "🥯",
+  "🥞",
+  "🧇",
+  "🧀",
+  "🥚",
+  "🍳",
+  "🧈",
+  "🥓",
+  "🥩",
+  // 料理・ファストフード・和食・中華など
+  "🍗",
+  "🍖",
+  "🦴",
+  "🌭",
+  "🍔",
+  "🍟",
+  "🍕",
+  "🥪",
+  "🥙",
+  "🧆",
+  "🌮",
+  "🌯",
+  "🫔",
+  "🥗",
+  "🥘",
+  "🫕",
+  "🥫",
+  "🍝",
+  "🍜",
+  "🍲",
+  "🍛",
+  "🍣",
+  "🍱",
+  "🥟",
+  "🦪",
+  "🍤",
+  "🍙",
+  "🍚",
+  "🍘",
+  "🍥",
+  "🥠",
+  "🥮",
+  // デザート・スイーツ
+  "🍦",
+  "🍧",
+  "🍨",
+  "🍩",
+  "🍪",
+  "🎂",
+  "🧁",
+  "🥧",
+  "🍰",
+  "🍫",
+  "🍬",
+  "🍭",
+  "🍮",
+  "🍯",
+  "🍿",
+  // 飲み物
+  "🍼",
+  "🥛",
+  "☕",
+  "🫖",
+  "🍵",
+  "🍶",
+  "🍾",
+  "🍷",
+  "🍸",
+  "🍹",
+  "🍺",
+  "🍻",
+  "🥂",
+  "🥃",
+  "🫗",
+  "🧃",
+  "🧉",
+  "🧊",
+  // 食器・調味料
+  "🥢",
+  "🍽️",
+  "🍴",
+  "🥄",
+  "🫙",
+  "🧂",
+];
+
+export const ANIMAL_EMOJIS = [
+  // 哺乳類・顔
+  "🐶",
+  "🐱",
+  "🐭",
+  "🐹",
+  "🐰",
+  "🦊",
+  "🐻",
+  "🐼",
+  "🐻‍❄️",
+  "🐨",
+  "🐯",
+  "🦁",
+  "🐮",
+  "🐷",
+  "🐸",
+  "🐵",
+  "🙈",
+  "🙉",
+  "🙊",
+  "🐒",
+  "🐺",
+  "🐗",
+  "🐴",
+  "🦄",
+  "🐝",
+  "🪱",
+  "🐛",
+  "🦋",
+  "🐌",
+  "🐞",
+  "🐜",
+  "🪰",
+  "🪲",
+  "🪳",
+  "🦟",
+  "🦗",
+  "🕷️",
+  "🦂",
+  "🐢",
+  "🐍",
+  "🦎",
+  "🦖",
+  "🦕",
+  "🐙",
+  "🦑",
+  "🦐",
+  "🦞",
+  "🦀",
+  "🐡",
+  "🐠",
+  "🐟",
+  "🐬",
+  "🐳",
+  "🐋",
+  "🦈",
+  "🦭",
+  "🐊",
+  "🐅",
+  "🐆",
+  "🦓",
+  "🦍",
+  "🦧",
+  "🐘",
+  "🦛",
+  "🦏",
+  "🐪",
+  "🐫",
+  "🦒",
+  "🦘",
+  "🦬",
+  "🐃",
+  "🐂",
+  "🐄",
+  "🐎",
+  "🐖",
+  "🐏",
+  "🐑",
+  "🦙",
+  "🐐",
+  "🦌",
+  "🐕",
+  "🐩",
+  "🦮",
+  "🐕‍🦺",
+  "🐈",
+  "🐈‍⬛",
+  "🐓",
+  "🦃",
+  "🦤",
+  "🦚",
+  "🦜",
+  "🦢",
+  "🦩",
+  "🕊️",
+  "🐇",
+  "🦝",
+  "🦨",
+  "🦡",
+  "🦫",
+  "🦦",
+  "🦥",
+  "🐁",
+  "🐀",
+  "🐿️",
+  "🦔",
+  "🐔",
+  "🐧",
+  "🐦",
+  "🐤",
+  "🐣",
+  "🐥",
+  "🦆",
+  "🦅",
+  "🦉",
+  "🦇",
+];
+
+export const OBJECT_EMOJIS = [
+  // 道具・文房具・日用品
+  "⌚",
+  "📱",
+  "💻",
+  "⌨️",
+  "🖥️",
+  "🖨️",
+  "🖱️",
+  "🕹️",
+  "💾",
+  "💿",
+  "📀",
+  "📷",
+  "📸",
+  "📹",
+  "🎥",
+  "📞",
+  "☎️",
+  "📟",
+  "📠",
+  "📺",
+  "📻",
+  "🎙️",
+  "🧭",
+  "⏱️",
+  "⏲️",
+  "⏰",
+  "🕰️",
+  "⌛",
+  "⏳",
+  "📡",
+  "🔋",
+  "🔌",
+  "💡",
+  "🔦",
+  "🕯️",
+  "🧯",
+  "💸",
+  "💵",
+  "💴",
+  "💶",
+  "💷",
+  "🪙",
+  "💰",
+  "💳",
+  "💎",
+  "⚖️",
+  "🧰",
+  "🪛",
+  "🔧",
+  "🔨",
+  "⚒️",
+  "🛠️",
+  "⛏️",
+  "🪚",
+  "🔩",
+  "⚙️",
+  "🧱",
+  "🧲",
+  "🔫",
+  "💣",
+  "🧨",
+  "🪓",
+  "🔪",
+  "🗡️",
+  "⚔️",
+  "🛡️",
+  "🔮",
+  "💈",
+  "⚗️",
+  "🔭",
+  "🔬",
+  "🩹",
+  "🩺",
+  "💊",
+  "💉",
+  "🩸",
+  "🧬",
+  "🦠",
+  "🧫",
+  "🧪",
+  "🌡️",
+  "🧹",
+  "🪠",
+  "🧺",
+  "🧻",
+  "🚽",
+  "🚰",
+  "🚿",
+  "🛁",
+  "🛀",
+  "🧼",
+  "🪥",
+  "🪒",
+  "🧽",
+  "🪣",
+  "🧴",
+  "🛎️",
+  "🔑",
+  "🗝️",
+  "🚪",
+  "🪑",
+  "🛋️",
+  "🛏️",
+  "🛌",
+  "🧸",
+  "🪆",
+  "🖼️",
+  "🪞",
+  "🪟",
+  "🛍️",
+  "🛒",
+  "🎁",
+  "🎈",
+  "🎏",
+  "🎀",
+  "🪄",
+  "🪅",
+  "🎊",
+  "🎉",
+  "🎎",
+  "🏮",
+  "🎐",
+  "🧧",
+  "✉️",
+  "📩",
+  "📨",
+  "📧",
+  "💌",
+  "📥",
+  "📤",
+  "📦",
+  "🏷️",
+  "🪧",
+  "📪",
+  "📫",
+  "📬",
+  "📭",
+  "📮",
+  "📯",
+  "📜",
+  "📃",
+  "📄",
+  "📑",
+  "🧾",
+  "📊",
+  "📈",
+  "📉",
+  "🗒️",
+  "🗓️",
+  "📆",
+  "📅",
+  "🗑️",
+  "📇",
+  "🗃️",
+  "🗳️",
+  "🗄️",
+  "📋",
+  "📁",
+  "📂",
+  "🗂️",
+  "🗞️",
+  "📰",
+  "📓",
+  "📔",
+  "📒",
+  "📕",
+  "📗",
+  "📘",
+  "📙",
+  "📚",
+  "📖",
+  "🔖",
+  "🧷",
+  "🔗",
+  "📎",
+  "🖇️",
+  "📐",
+  "📏",
+  "🧮",
+  "📌",
+  "📍",
+  "✂️",
+  "🖊️",
+  "🖋️",
+  "✒️",
+  "🖌️",
+  "🖍️",
+  "📝",
+  "✏️",
+  "🔍",
+  "🔎",
+  "🔏",
+  "🔐",
+  "🔒",
+  "🔓",
+];
+
+/**
+ * 論理ノート（groupId）ごとに絵文字インデックスをランダム割り当てする。
+ * - 同一 groupId（ロング分割スライス同士）は必ず同じ絵文字
+ * - noteNumber % N は使わず、出やすい音高に絵文字が偏らないようにする
+ * - グループ数が絵文字数を超える場合はシャッフルを繰り返して循環
+ */
+function assignEmojiIndices(notes, emojiCount = FOOD_EMOJIS.length) {
+  if (!notes || notes.length === 0 || emojiCount <= 0) return;
+  const shuffle = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+    return arr;
+  };
+  // groupId がある場合（ロング分割など）はグループ単位で同じ絵文字にする
+  const groups = [];
+  const seen = new Set();
+  for (const n of notes) {
+    const g = n.groupId;
+    if (g == null || seen.has(g)) continue;
+    seen.add(g);
+    groups.push(g);
+  }
+  let pool = shuffle(Array.from({ length: emojiCount }, (_, i) => i));
+  let poolPos = 0;
+  const map = new Map();
+  for (const g of groups) {
+    if (poolPos >= pool.length) {
+      pool = shuffle(Array.from({ length: emojiCount }, (_, i) => i));
+      poolPos = 0;
+    }
+    map.set(g, pool[poolPos++]);
+  }
+  // groupId なしノート用の独立プール（noteNumber 偏りを避ける）
+  let soloPool = shuffle(Array.from({ length: emojiCount }, (_, i) => i));
+  let soloPos = 0;
+  for (const n of notes) {
+    const g = n.groupId;
+    if (g != null && map.has(g)) {
+      n.emojiIndex = map.get(g);
+    } else {
+      if (soloPos >= soloPool.length) {
+        soloPool = shuffle(Array.from({ length: emojiCount }, (_, i) => i));
+        soloPos = 0;
+      }
+      n.emojiIndex = soloPool[soloPos++];
+    }
+  }
+}
+
+// 絵文字をオフスクリーンキャンバスに描画してキャッシュする。
+// キー: `${emoji}@${size}` → Canvas / OffscreenCanvas
+// サイズは 4px 単位に量子化してヒット率を上げる。
+// レーン幅変更（#invalidateCache）時のみ全クリアする。
+const _emojiCache = new Map();
+const EMOJI_SIZE_STEP = 4;
+const EMOJI_CACHE_MAX = 512; // エントリ上限（古いものから削除）。food≈120 / object≈195 を1サイズで収める
+
+function quantizeEmojiSize(size) {
+  const s = Math.max(12, Math.round(size));
+  return Math.max(12, Math.round(s / EMOJI_SIZE_STEP) * EMOJI_SIZE_STEP);
+}
+
+function getEmojiCanvas(emoji, size) {
+  const q = quantizeEmojiSize(size);
+  const key = `${emoji}@${q}`;
+  let oc = _emojiCache.get(key);
+  if (oc) {
+    // LRU 風: 再挿入して末尾へ
+    _emojiCache.delete(key);
+    _emojiCache.set(key, oc);
+    return oc;
+  }
+  if (typeof OffscreenCanvas !== "undefined") {
+    oc = new OffscreenCanvas(q, q);
+  } else if (typeof document !== "undefined") {
+    oc = document.createElement("canvas");
+    oc.width = q;
+    oc.height = q;
+  } else {
+    // Worker かつ OffscreenCanvas 非対応環境では描画スキップ用に null
+    return null;
+  }
+  const ctx = oc.getContext("2d");
+  ctx.clearRect(0, 0, q, q);
+  // 絵文字は OS フォント差が大きいので複数フォールバック
+  ctx.font = `${
+    Math.round(q * 0.78)
+  }px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(emoji, q / 2, q / 2 + q * 0.02);
+  // 上限超過時は最古を削除
+  if (_emojiCache.size >= EMOJI_CACHE_MAX) {
+    const oldest = _emojiCache.keys().next().value;
+    _emojiCache.delete(oldest);
+  }
+  _emojiCache.set(key, oc);
+  return oc;
+}
+
+function clearEmojiCache() {
+  _emojiCache.clear();
+}
 
 // 判定FX の定義テーブル（毎フレームのswitch/文字列生成を回避）
 // size は論理px（dpr=1基準）。描画時に o.dpr を掛ける。
@@ -530,6 +1090,17 @@ export class RhythmGame {
       // ホスト側（canvas の上に浮く透過ナビ等）が右上 HUD と重ならないように
       // 避けてほしい量。canvas 座標系（dpr込み）でのpx。0=従来通り詰める。
       topInset: options.topInset ?? 0,
+      // ノート見た目: "tile" | "food" | "animal" | "object"
+      noteType: options.noteType ?? (options.emojiMode ? "food" : "tile"),
+      emojis: options.emojis ?? (
+        (() => {
+          const nt = options.noteType ?? (options.emojiMode ? "food" : "tile");
+          if (nt === "food") return FOOD_EMOJIS;
+          if (nt === "animal") return ANIMAL_EMOJIS;
+          if (nt === "object") return OBJECT_EMOJIS;
+          return [];
+        })()
+      ),
     };
     this.#lanePressed = new Array(laneCount).fill(false);
     this.#laneLastEmpty = new Float64Array(laneCount).fill(-1e9);
@@ -697,6 +1268,14 @@ export class RhythmGame {
       this.#opts.buttonZoneHeight = patch.buttonZoneHeight;
       dirty = true;
     }
+    if (patch.noteType !== undefined) {
+      this.#opts.noteType = patch.noteType;
+      dirty = true;
+    }
+    if (patch.emojis !== undefined) {
+      this.#opts.emojis = patch.emojis;
+      dirty = true;
+    }
     if (patch.judgeOffset !== undefined) {
       this.#opts.judgeOffset = patch.judgeOffset;
     }
@@ -778,6 +1357,8 @@ export class RhythmGame {
   #invalidateCache() {
     this.#cachedW = 0; // force recalculation
     this.#uiDirty = true;
+    // レーン幅が変わったら絵文字キャッシュも無効化する（pick-pack と同じ）
+    clearEmojiCache();
   }
 
   #loop() {
@@ -1316,7 +1897,57 @@ export class RhythmGame {
         // 通過後もfixed高さのまま（duration由来の長さにしない）
         const drawTop = Math.max(0, drawBot - noteHeight);
         if (drawBot <= drawTop) continue;
-        drawTrap(laneIdx, drawTop, drawBot, color, 0.55, r);
+        if (
+          o.noteType && o.noteType !== "tile" && o.emojis && o.emojis.length > 0
+        ) {
+          const emojis = o.emojis;
+          const idx = Number.isFinite(note.emojiIndex)
+            ? ((note.emojiIndex % emojis.length) + emojis.length) %
+              emojis.length
+            : ((note.noteNumber % emojis.length) + emojis.length) %
+              emojis.length;
+          const emoji = emojis[idx];
+          // 絵文字ノートは正方形。射影を考慮したレーン幅 × 75% でサイズ決定。
+          // 中心Xは絵文字の視覚中央（midY）で取る。下端基準だと左右レーンで
+          // 外寄りに見えてしまうため。
+          const laneWNow = this.#perspLaneW(
+            laneW,
+            cW,
+            drawBot,
+            hitY,
+            p,
+            btnBot,
+          );
+          const drawSize = quantizeEmojiSize(Math.max(12, laneWNow * 0.75));
+          const laneWHit = this.#perspLaneW(laneW, cW, hitY, hitY, p, btnBot);
+          const cacheSize = quantizeEmojiSize(Math.max(12, laneWHit * 0.75));
+          const oc = getEmojiCanvas(emoji, cacheSize);
+          if (oc) {
+            const midY = drawBot - drawSize / 2;
+            const xL = this.#perspX(laneIdx, laneW, cW, midY, hitY, p, btnBot);
+            const xR = this.#perspX(
+              laneIdx + 1,
+              laneW,
+              cW,
+              midY,
+              hitY,
+              p,
+              btnBot,
+            );
+            const ex = (xL + xR) / 2;
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 0.45;
+            ctx.drawImage(
+              oc,
+              ex - drawSize / 2,
+              drawBot - drawSize,
+              drawSize,
+              drawSize,
+            );
+          }
+        } else {
+          drawTrap(laneIdx, drawTop, drawBot, color, 0.55, r);
+        }
         continue;
       }
 
@@ -1330,8 +1961,51 @@ export class RhythmGame {
       // タップは常に短い固定長で描く。
       const tapBot = drawBot;
       const tapTop = Math.max(0, tapBot - noteHeight);
-      drawTrap(laneIdx, tapTop, tapBot, color, 1, r);
-      ctx.shadowBlur = glow ? 14 * d : 0;
+
+      // 絵文字モード：色付きバーの代わりに絵文字を落とす
+      if (
+        o.noteType && o.noteType !== "tile" && o.emojis && o.emojis.length > 0
+      ) {
+        const emojis = o.emojis;
+        const idx = Number.isFinite(note.emojiIndex)
+          ? ((note.emojiIndex % emojis.length) + emojis.length) % emojis.length
+          : ((note.noteNumber % emojis.length) + emojis.length) % emojis.length;
+        const emoji = emojis[idx];
+        // 絵文字ノートは正方形。射影を考慮したレーン幅 × 75% でサイズ決定。
+        // 中心Xは絵文字の視覚中央（midY）で取る。下端基準だと左右レーンで
+        // 外寄りに見えてしまうため。
+        const laneWNow = this.#perspLaneW(laneW, cW, tapBot, hitY, p, btnBot);
+        const drawSize = quantizeEmojiSize(Math.max(12, laneWNow * 0.75));
+        const laneWHit = this.#perspLaneW(laneW, cW, hitY, hitY, p, btnBot);
+        const cacheSize = quantizeEmojiSize(Math.max(12, laneWHit * 0.75));
+        const oc = getEmojiCanvas(emoji, cacheSize);
+        if (oc) {
+          const midY = tapBot - drawSize / 2;
+          const xL = this.#perspX(laneIdx, laneW, cW, midY, hitY, p, btnBot);
+          const xR = this.#perspX(
+            laneIdx + 1,
+            laneW,
+            cW,
+            midY,
+            hitY,
+            p,
+            btnBot,
+          );
+          const ex = (xL + xR) / 2;
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
+          ctx.drawImage(
+            oc,
+            ex - drawSize / 2,
+            tapBot - drawSize,
+            drawSize,
+            drawSize,
+          );
+        }
+      } else {
+        drawTrap(laneIdx, tapTop, tapBot, color, 1, r);
+        ctx.shadowBlur = glow ? 14 * d : 0;
+      }
     }
 
     ctx.globalAlpha = prevAlpha;
