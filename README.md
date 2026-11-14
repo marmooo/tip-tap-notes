@@ -24,8 +24,7 @@ Settings Screen ![Settings Screen](screenshots/mugen/05.png)
 
 Score Screen ![Score Screen](screenshots/mugen/06.png)
 
-Customization - Note Type
-![Customization - Note Type](screenshots/mugen/07.png)
+Customization - Note Type ![Customization - Note Type](screenshots/mugen/07.png)
 
 Customization - Background
 ![Customization - Background](screenshots/mugen/08.png)
