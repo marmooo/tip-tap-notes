@@ -357,6 +357,7 @@ let lastResult = {
 };
 // Judgment order powers the result card's compact play-history timeline.
 let playHistory = [];
+
 let pendingAnalysisResolve = null;
 let pendingAnalysisReject = null;
 
@@ -887,7 +888,6 @@ function ensureWorker() {
 }
 
 function beginPlayback() {
-  playHistory = [];
   endingFadeStarted = false;
   endingFadeStartPerf = 0;
   if (endingFadeTimeoutId !== null) {
@@ -897,6 +897,7 @@ function beginPlayback() {
   // 音量の復元は startMidiPlayback() 内（midy.start() 直前）で行うため、
   // ここでは MIDI モードの setMasterVolume は不要。audio モードは即時復元で OK。
   if (mode === "audio") player.volume = 1;
+  playHistory = [];
   lastResult = {
     score: 0,
     combo: 0,
@@ -952,7 +953,8 @@ function applyConfigToGame(cfg) {
 
   config = cfg;
   if (laneOrDiffChanged) {
-    if (typeof updateDocumentTitle === "function") updateDocumentTitle();
+    updateDocumentTitle();
+    // ライブラリ曲を開いているときは URL の d も現在の難易度に合わせる
     const params = new URLSearchParams(location.search);
     if (params.has("c") && params.has("i")) {
       const diff = config.difficulty || "NORMAL";
@@ -980,12 +982,12 @@ function applyConfigToGame(cfg) {
 
   if (gamePhase === "playing" && !endingFadeStarted) {
     if (structuralChanged || laneOrDiffChanged) {
-      playHistory = [];
       // 譜面配置やレーン構造が変わるので Worker を立て直して notes を再送
       stopRaf();
       buildGame();
       applyNotes();
       worker.postMessage({ type: "start" });
+      playHistory = [];
       lastResult = {
         score: 0,
         combo: 0,
@@ -1424,7 +1426,24 @@ function drawWrappedTrackLabel(ctx, x, y, maxWidth, lineHeight, maxLines = 2) {
   return lines.length;
 }
 
-/** 共有テキスト用（長すぎる曲名は文字数で抑える） */
+function scoreCardFileName() {
+  return `tip-tap-notes-${new Date().toISOString().slice(0, 10)}.png`;
+}
+
+function downloadScoreCard(blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = scoreCardFileName();
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById("btnSaveScore")?.addEventListener("click", () => {
+  const canvas = document.getElementById("scoreCardCanvas");
+  canvas?.toBlob((blob) => blob && downloadScoreCard(blob), "image/png");
+});
+
 function formatTrackShareLabel(maxChars = 48) {
   const meta = currentTrackMeta;
   if (!meta) return "";
@@ -1452,24 +1471,6 @@ function updateDocumentTitle() {
     document.title = "Tip Tap Notes";
   }
 }
-
-function scoreCardFileName() {
-  return `tip-tap-notes-${new Date().toISOString().slice(0, 10)}.png`;
-}
-
-function downloadScoreCard(blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = scoreCardFileName();
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-document.getElementById("btnSaveScore")?.addEventListener("click", () => {
-  const canvas = document.getElementById("scoreCardCanvas");
-  canvas?.toBlob((blob) => blob && downloadScoreCard(blob), "image/png");
-});
 
 document.getElementById("btnShareScore")?.addEventListener("click", () => {
   const shareUrl = getShareUrl();
@@ -2526,6 +2527,7 @@ function getShareUrl() {
     share.set("c", params.get("c"));
     share.set("i", params.get("i"));
     if (params.get("db") === "c") share.set("db", "c");
+    // if (params.get("title")) share.set("title", params.get("title"));
     const diff = config.difficulty || "NORMAL";
     if (DIFFICULTIES[diff]) share.set("d", diff);
     return `${location.origin}${location.pathname}?${share.toString()}`;
@@ -2544,6 +2546,7 @@ function updateUrlFromLibraryRow(row) {
   params.set("c", c);
   params.set("i", String(i));
   if (midiLibrary.midiDB === MIDI_DB_CLASSICAL) params.set("db", "c");
+  if (row.title) params.set("title", row.title);
   const diff = config.difficulty || "NORMAL";
   if (DIFFICULTIES[diff]) params.set("d", diff);
   const url = `${location.pathname}?${params.toString()}${location.hash || ""}`;
@@ -2682,7 +2685,10 @@ function trackMetaFromLibraryRow(row) {
   const collectionId = String(row.file || "").split("/")[0] || "";
   const col = collectionId ? midiLibrary.collections.get(collectionId) : null;
   const web = row.web || col?.web || "";
-  const siteName = row.collection || col?.name || collectionId || "";
+  // Prefer collections.json `name` (display name) over row.collection / id.
+  // Share-link loads may have no row.collection and an empty collections Map;
+  // callers that need the proper name should ensure collections are available.
+  const siteName = col?.name || row.collection || collectionId || "";
   const license = row.license || col?.license || "";
   const title = row.title || "";
   const composer = row.composer || col?.composer || "";
@@ -2721,7 +2727,19 @@ async function loadMIDIFromQuery() {
       throw new Error(`MIDI not found: ${collectionId}#${index}`);
     }
 
-    const col = midiLibrary.collections?.get(collectionId);
+    // Share links intentionally skip full playlist load, but we still need
+    // collections.json so the score card / attribution can show the display
+    // name (e.g. "般若's MIDIの里") instead of the URL id ("般若sMIDIの里").
+    if (!midiLibrary.collections.has(collectionId)) {
+      try {
+        const cols = await (await fetch(`${dbBase}/collections.json`)).json();
+        for (const c of cols) midiLibrary.collections.set(c.id, c);
+      } catch (err) {
+        console.warn("Failed to load collections for share link meta:", err);
+      }
+    }
+
+    const col = midiLibrary.collections.get(collectionId);
     if (col) {
       if (!row.collection) row.collection = col.name;
       if (!row.composer && col.composer) row.composer = col.composer;
@@ -3229,6 +3247,7 @@ function beginAudioRound() {
       clearTimeout(endingFadeTimeoutId);
       endingFadeTimeoutId = null;
     }
+    playHistory = [];
     lastResult = {
       score: 0,
       combo: 0,
@@ -3238,7 +3257,6 @@ function beginAudioRound() {
       miss: 0,
       total: laneNotes.length,
     };
-    playHistory = [];
     worker?.postMessage({ type: "start" });
     isPaused = false;
     showPlayHud();
