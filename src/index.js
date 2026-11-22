@@ -10,7 +10,6 @@
  * rhythm-game-worker.js での判定/描画）は完全に共通。
  */
 
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.7.3/dist/midy.wasm.js";
 import { Modal } from "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/+esm";
 import {
   ANIMAL_EMOJIS,
@@ -22,6 +21,55 @@ import {
 } from "./rhythm-game.js";
 import { MidiLibrary } from "https://marmooo.github.io/free-midi/midi-library.js";
 import { installIOSTouchGuards } from "/tip-tap-notes/ios-touch-guards.js";
+import {
+  simd as detectSimd,
+  threads as detectThreads,
+} from "https://cdn.jsdelivr.net/npm/wasm-feature-detect@1.10.1/dist/esm/index.js";
+
+// ---------------------------------------------------------------------------
+// Cross-origin isolation is established early via the inline <script> in
+// <head> (SW registration + one-time reload). Here we only log the status
+// and fall back gracefully if isolation is still missing.
+// ---------------------------------------------------------------------------
+if (!globalThis.crossOriginIsolated) {
+  console.warn(
+    "[tip-tap-notes] crossOriginIsolated=false — SharedArrayBuffer / wasm-threads may be unavailable. " +
+      "If this is the first visit, a reload should have been triggered by the early SW script.",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Select midy WASM build via wasm-feature-detect
+// Priority: threaded-simd > threads > simd > plain wasm
+// ---------------------------------------------------------------------------
+const MIDY_BASE = "https://cdn.jsdelivr.net/gh/marmooo/midy@0.7.5/dist";
+const MIDY_BUILDS = {
+  "threaded-simd": `${MIDY_BASE}/midy.wasm-threaded-simd.js`,
+  "threads": `${MIDY_BASE}/midy.wasm-threads.js`,
+  "simd": `${MIDY_BASE}/midy.wasm-simd.js`,
+  "wasm": `${MIDY_BASE}/midy.wasm.js`,
+};
+
+async function selectMidyBuild() {
+  // threads() also checks SharedArrayBuffer (fails without cross-origin isolation)
+  const [hasSimd, hasThreads] = await Promise.all([
+    detectSimd(),
+    detectThreads(),
+  ]);
+  let key;
+  if (hasThreads && hasSimd) key = "threaded-simd";
+  else if (hasThreads) key = "threads";
+  else if (hasSimd) key = "simd";
+  else key = "wasm";
+  console.info(
+    `[tip-tap-notes] midy build: ${key} (simd=${hasSimd}, threads=${hasThreads}, crossOriginIsolated=${!!globalThis
+      .crossOriginIsolated})`,
+  );
+  return { key, url: MIDY_BUILDS[key] };
+}
+
+const { url: midyUrl } = await selectMidyBuild();
+const { Midy } = await import(midyUrl);
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -113,13 +161,13 @@ const DEFAULT_CONFIG = {
   // Canvas 解像度の上限（devicePixelRatio をこの値でキャップ）。
   // 既定 1 = 負荷を抑えて安定優先。高いほどシャープだがメモリ/GPU 負荷が増え、モバイルで不安定になりやすい。
   maxPixelRatio: 1,
-  // Midy の sample キャッシュ粒度。none → ads → adsr → note → segment → chunk。
+  // Midy の sample キャッシュ粒度。none → worklet → segment → chunk → audio。
   // 高いほど複雑な MIDI で効率が良いが、iOS の OfflineAudioContext 不具合で落ちやすくなる。
   cacheMode: isIOS ? "none" : "chunk",
 };
 
-// midy.cacheMode の段階（スライダー 0–5 と対応）
-const CACHE_MODES = ["none", "ads", "adsr", "note", "segment", "chunk"];
+// midy.cacheMode の段階（スライダー 0–4 と対応）
+const CACHE_MODES = ["none", "worklet", "segment", "chunk", "audio"];
 
 function cacheModeIndex(mode) {
   const i = CACHE_MODES.indexOf(mode);

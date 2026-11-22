@@ -17,6 +17,27 @@
         document.documentElement.setAttribute("data-bs-theme", theme);
       })();
     </script>
+    <!-- Early Service Worker registration for COOP/COEP (SharedArrayBuffer) -->
+    <script>
+      (function () {
+        if (!("serviceWorker" in navigator)) return;
+        const SW_URL = "/tip-tap-notes/sw.js";
+        const SW_SCOPE = "/tip-tap-notes/";
+        const KEY = "tip-tap-notes-coi-reloaded";
+        navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE }).then(function () {
+          // Already controlled → isolation headers are active
+          if (navigator.serviceWorker.controller) return;
+          // First visit: force one reload so the SW can inject COOP/COEP
+          if (!sessionStorage.getItem(KEY)) {
+            sessionStorage.setItem(KEY, "1");
+            location.reload();
+          }
+        }).catch(function (err) {
+          console.warn("[tip-tap-notes] SW registration failed:", err);
+        });
+      })();
+    </script>
+
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-F2179JXDYY"></script>
     <script>
@@ -825,9 +846,9 @@
 
                 <div class="mb-3">
                   <label class="form-label d-flex justify-content-between">
-                    MIDI 缓存级别 <span id="cacheModeVal">5（分块）</span>
+                    MIDI 缓存级别 <span id="cacheModeVal">3（chunk）</span>
                   </label>
-                  <input type="range" class="form-range" id="cacheMode" min="0" max="5" step="1" value="5">
+                  <input type="range" class="form-range" id="cacheMode" min="0" max="4" step="1" value="3">
                   <div class="small text-muted mt-1">
                     级别越高，对复杂 MIDI 的缓存越积极（可能会占用更多内存）。
                     如果在 iOS 上播放 MIDI 时游戏崩溃，请将优化级别设置为 0。
