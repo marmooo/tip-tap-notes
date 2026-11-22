@@ -36,10 +36,6 @@ self.addEventListener("fetch", (event) => {
       const headers = new Headers(response.headers);
       headers.set("Cross-Origin-Opener-Policy", COOP);
       headers.set("Cross-Origin-Embedder-Policy", COEP);
-      // Help same-origin resources be embeddable under COEP.
-      if (!headers.has("Cross-Origin-Resource-Policy")) {
-        headers.set("Cross-Origin-Resource-Policy", "same-origin");
-      }
 
       return new Response(response.body, {
         status: response.status,
