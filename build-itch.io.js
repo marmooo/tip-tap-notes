@@ -122,6 +122,17 @@ function transform(content) {
     `const SOUNDFONT_BASE = "./soundfont"`,
   );
 
+  // --- midy: jsdelivr → ローカル ./midy（SIMD/threads ビルド同梱） ---
+  // バージョンピン付き URL もまとめて置換
+  s = s.replace(
+    /const MIDY_BASE = "https:\/\/cdn\.jsdelivr\.net\/gh\/marmooo\/midy@[^"]+\/dist"/g,
+    `const MIDY_BASE = "./midy"`,
+  );
+  s = s.replace(
+    /const MIDY_BASE = "https:\/\/cdn\.jsdelivr\.net\/npm\/@marmooo\/midy@[^"]+\/dist"/g,
+    `const MIDY_BASE = "./midy"`,
+  );
+
   // --- midi-db (modern / classical) ---
   // index.js は MIDI_DB_MODERN / MIDI_DB_CLASSICAL の2定数。
   // itch.io 同梱は INCLUDE_COLLECTIONS（midi-db 側）のみなので、両方を ./midi-db に寄せる。
@@ -183,6 +194,48 @@ function transform(content) {
     /location\.href\s*=\s*[`'"]\/tip-tap-notes\/\$\{lang\}\/[`'"]/g,
     "location.href = `./`",
   );
+
+  // --- COOP/COEP isolation (SharedArrayBuffer / wasm-threads)
+  // src の HTML には載せない（github.io は AdSense のため isolation off）。
+  // itch.io ビルド時だけ、HTML に early SW 登録を挿入する（JS には触らない）。
+  if (/<!DOCTYPE\s+html|<html[\s>]/i.test(s)) {
+    const isolationScript =
+      `    <!-- Early Service Worker registration for COOP/COEP (SharedArrayBuffer) -->
+    <script>
+      (function () {
+        if (!("serviceWorker" in navigator)) return;
+        const SW_URL = "./sw.js";
+        const SW_SCOPE = "./";
+        const KEY = "tip-tap-notes-coi-reloaded";
+        navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE }).then(function () {
+          // Already controlled → isolation headers are active
+          if (navigator.serviceWorker.controller) return;
+          // First visit: force one reload so the SW can inject COOP/COEP
+          if (!sessionStorage.getItem(KEY)) {
+            sessionStorage.setItem(KEY, "1");
+            location.reload();
+          }
+        }).catch(function (err) {
+          console.warn("[tip-tap-notes] SW registration failed:", err);
+        });
+      })();
+    </script>
+`;
+    // 残骸があれば除去（旧 src からのコピー対策）
+    s = s.replace(
+      /\n?\s*<!-- Early Service Worker registration for COOP\/COEP \(SharedArrayBuffer\) -->\s*<script>\s*\(function \(\) \{[\s\S]*?\}\)\(\);\s*<\/script>\s*/g,
+      "\n",
+    );
+    // dark-mode テーマ script（data-bs-theme）の直後に挿入。無ければ <head> 直後。
+    const m = s.match(
+      /(<script>\s*\(function\(\)\s*\{[\s\S]*?data-bs-theme[\s\S]*?\}\)\(\);\s*<\/script>)/,
+    );
+    if (m) {
+      s = s.replace(m[0], m[0] + "\n" + isolationScript);
+    } else {
+      s = s.replace(/<head([^>]*)>/i, (a) => a + "\n" + isolationScript);
+    }
+  }
 
   return s;
 }
