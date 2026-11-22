@@ -20,6 +20,7 @@
     <!-- Early Service Worker registration for COOP/COEP (SharedArrayBuffer) -->
     <script>
       (function () {
+        if (location.hostname === "marmooo.github.io") return;
         if (!("serviceWorker" in navigator)) return;
         const SW_URL = "/tip-tap-notes/sw.js";
         const SW_SCOPE = "/tip-tap-notes/";
